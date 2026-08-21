@@ -1,0 +1,7 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+spotread: Argyll CMS Version 3.5.0
+Instrument: X-Rite i1Display Pro Synthetic
+Result is XYZ: 19.0100 20.0000 21.7800, D50 Lab: 51.837 0.003 -0.006
+Result is Yxy: 20.0000 0.312700 0.329000
+CCT = 6504 K
+Warning: synthetic low light advisory retained for testing.

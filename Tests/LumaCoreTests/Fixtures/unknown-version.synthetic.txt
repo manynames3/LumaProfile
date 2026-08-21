@@ -1,0 +1,5 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+dispcal version 9.0.0
+Patch 1 of 2
+Patch 2 of 2
+Calibration complete.

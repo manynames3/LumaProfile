@@ -1,0 +1,6 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+dispread version 3.5.0
+Reading 1 of 96
+Patch 48/96
+100% complete
+Synthetic characterization finished; display.ti3 created.

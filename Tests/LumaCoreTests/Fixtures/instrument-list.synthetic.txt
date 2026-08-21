@@ -1,0 +1,8 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+spotread: Argyll CMS Version 3.5.0
+ -c listno                  Choose communication port or instrument from the following list
+    2 = 'JETI specbos Synthetic' (serial number SYN-JETI-200)
+    1 = 'X-Rite i1Display Pro Synthetic' (serial number SYN-I1D3-100)
+    1 = 'Duplicate Synthetic Entry'
+ -d n                       Choose the display from the following list
+    1 = 'Synthetic Display at 0, 0, width 3840, height 2160'

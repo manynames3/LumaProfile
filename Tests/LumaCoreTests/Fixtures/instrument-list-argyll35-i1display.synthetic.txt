@@ -1,0 +1,8 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+Measure spot values, Version 3.5.0
+Author: Synthetic Fixture Author
+usage: spotread [-options] [logfile]
+ -c listno            Set instrument port from the following list (default 1)
+    1 = 'hid33: (X-Rite i1 DisplayPro, ColorMunki Display)'
+    2 = '/dev/cu.Synthetic-Bluetooth-Port'
+ -t                   Use transmission measurement mode

@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a focused improvement to LumaProfile.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe the end-user problem before proposing an implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should a user be able to accomplish, and how would success be verified?
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Calibration and recovery impact
+      description: Note any effect on display selection, meter input, profile activation, rollback, privacy, or ArgyllCMS packaging.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

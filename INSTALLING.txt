@@ -1,0 +1,23 @@
+LumaProfile — Install and Open
+================================
+
+1. Drag LumaProfile.app onto the Applications shortcut.
+2. Open LumaProfile from Applications.
+
+This portfolio build is ad-hoc signed. It is not notarized or
+Gatekeeper-approved. On first launch, macOS may require one narrow exception:
+
+- In Finder, Control-click or right-click LumaProfile and choose Open, then Open.
+- If macOS still blocks it, use System Settings > Privacy & Security to approve
+  this specific LumaProfile app, then try again.
+
+Do not disable Gatekeeper, change broad security settings, or run LumaProfile as
+root. ArgyllCMS 3.5.0 is already bundled; no separate engine install or PATH
+change is needed.
+
+LumaProfile generates an ICC candidate without activating it. It changes the
+selected display profile only after you explicitly choose Activate & Verify.
+
+This build's automated checks do not replace the live-meter acceptance checklist
+included in the corresponding source. Test with your exact Mac, display, and
+i1Display before relying on it for consequential color work.

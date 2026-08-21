@@ -1,0 +1,85 @@
+name: Bug report
+description: Report a reproducible LumaProfile application or packaging problem.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve LumaProfile. Never post meter serial numbers, personal file paths, or an unsanitized session archive in a public issue.
+
+  - type: input
+    id: version
+    attributes:
+      label: LumaProfile version
+      description: Use the version shown in About or the DMG filename. Include the release commit from the release metadata when available.
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS
+      description: Include the Apple Silicon Mac model and exact macOS version, but no device serial numbers.
+      placeholder: MacBook Pro (M-series), macOS 15.x
+    validations:
+      required: true
+
+  - type: input
+    id: display
+    attributes:
+      label: Display setup
+      description: Display make/model, connection type, resolution, refresh rate, and whether more than one display was attached.
+      placeholder: External display over USB-C, 3840×2160 at 60 Hz
+    validations:
+      required: true
+
+  - type: input
+    id: meter
+    attributes:
+      label: Meter and mode
+      description: Meter product name, firmware when known, and Auto/Refresh/Non-refresh mode. Do not include its serial number.
+      placeholder: X-Rite i1Display Pro, Auto
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: State what was selected, the workflow stage, and the exact action that triggered the problem.
+      placeholder: |
+        1. Select …
+        2. Start …
+        3. Observe …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+      description: Explain what you expected and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Paste only the smallest relevant excerpt. Remove usernames, home-directory paths, meter serials, and unrelated USB details.
+      render: text
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I did not run LumaProfile with sudo or as root.
+          required: true
+        - label: I have stated whether the Before profile was restored or recovery is still required.
+          required: true
+        - label: I removed personal paths and hardware serial numbers from public diagnostics.
+          required: true

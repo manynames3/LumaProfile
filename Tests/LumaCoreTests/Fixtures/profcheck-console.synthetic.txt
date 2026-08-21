@@ -1,0 +1,6 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+profcheck version 3.5.0
+Sample 1 of 24
+Sample 24 of 24
+Caution: synthetic maximum error exceeds the fixture threshold.
+Profile check complete.

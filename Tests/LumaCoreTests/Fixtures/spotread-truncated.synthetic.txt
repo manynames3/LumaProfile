@@ -1,0 +1,3 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+spotread version 3.5.0
+Result is XYZ: 19.0100 20.0000

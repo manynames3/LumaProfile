@@ -1,0 +1,3 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+Peripheral topology token: alpha/beta/gamma
+Unrecognized enumeration payload follows without numbered entries.

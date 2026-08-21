@@ -1,0 +1,7 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+dispcal version 3.5.0
+Patch 1 of 12
+Adjustment 50%
+Warning: synthetic brightness is outside the target tolerance.
+Patch 12/12
+Calibration complete; synthetic display.cal created.

@@ -1,0 +1,79 @@
+name: Hardware compatibility report
+description: Record a sanitized pass, failure, or blocked live-device checklist result.
+title: "[Hardware]: "
+labels:
+  - hardware
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One hardware result applies only to the recorded setup. Do not generalize it to other displays, meters, firmware, docks, or macOS builds. Use `docs/manual-hardware-acceptance.md` and omit serial numbers from public evidence.
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Checklist outcome
+      options:
+        - PASS
+        - FAIL
+        - BLOCKED
+    validations:
+      required: true
+
+  - type: input
+    id: revision
+    attributes:
+      label: LumaProfile version and commit
+      placeholder: 0.1.0 — 40-character commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Mac and macOS build
+      placeholder: Apple Silicon Mac model, macOS version/build
+    validations:
+      required: true
+
+  - type: input
+    id: display
+    attributes:
+      label: Display configuration
+      description: Make/model, connection, resolution, refresh rate, and picture mode; omit serials.
+    validations:
+      required: true
+
+  - type: input
+    id: meter
+    attributes:
+      label: Meter configuration
+      description: Product, firmware when known, measurement mode, and correction name; omit serials.
+    validations:
+      required: true
+
+  - type: textarea
+    id: failed_items
+    attributes:
+      label: Failed or blocked checklist items
+      description: Enter “None” for a pass. Otherwise cite each unchecked item and what happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Include relevant measurements, profile checksum, and short log excerpts without personal paths or hardware serials.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: recovery
+    attributes:
+      label: Recovery state
+      options:
+        - label: The active ColorSync association and VideoLUT recovery outcome are explicitly recorded above.
+          required: true
+        - label: No claim exceeds what this single completed checklist demonstrates.
+          required: true

@@ -1,0 +1,4 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+dispread version 3.5.0
+Patch 7 of
+interrupted synthetic output without completion

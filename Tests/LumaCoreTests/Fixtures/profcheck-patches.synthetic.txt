@@ -1,0 +1,6 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+profcheck version 3.5.0
+[ 0.5000 ] Patch 1: 0 0 0 -> synthetic reference
+[ 1.0000 ] Patch 2: 50 50 50 -> synthetic reference
+[ 2.5000 ] Patch 3: 100 100 100 -> synthetic reference
+Warning: synthetic patch tolerance warning.

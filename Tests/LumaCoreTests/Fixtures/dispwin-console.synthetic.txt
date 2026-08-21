@@ -1,0 +1,4 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+Argyll CMS Version 3.5.0
+Installed synthetic display profile association.
+Display profile update complete.

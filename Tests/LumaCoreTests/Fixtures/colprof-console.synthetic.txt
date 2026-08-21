@@ -1,0 +1,5 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+colprof version 3.5.0
+10% building synthetic matrix curves
+65% building synthetic lookup data
+100% profile created: Synthetic Display.icc

@@ -1,0 +1,2 @@
+[SYNTHETIC TEST FIXTURE — NOT HARDWARE OUTPUT]
+Firmware Date: 05Jun12 dispcal: Warning - new_dispwin: Frame buffer depth 8 doesn't match VideoLUT 10 next_con_char: tcgetattr failed with 'Inappropriate ioctl for device' on stdinPlace instrument on test window. Hit Esc or Q to give up, any other key to continue:
