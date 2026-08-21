@@ -1,5 +1,6 @@
 @preconcurrency import Foundation
 import Darwin
+import Dispatch
 
 public enum ProcessExecutionError: Error, LocalizedError, Sendable {
     case invalidExecutable(URL)
@@ -24,6 +25,36 @@ public enum ProcessExecutionError: Error, LocalizedError, Sendable {
     }
 }
 
+private final class ProcessExitWaiter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var status: Int32?
+    private var continuation: CheckedContinuation<Int32, Never>?
+
+    func wait() async -> Int32 {
+        await withCheckedContinuation { continuation in
+            let completedStatus = lock.withLock { () -> Int32? in
+                if let status {
+                    return status
+                }
+                self.continuation = continuation
+                return nil
+            }
+            if let completedStatus {
+                continuation.resume(returning: completedStatus)
+            }
+        }
+    }
+
+    func processDidExit(with status: Int32) {
+        let continuation = lock.withLock { () -> CheckedContinuation<Int32, Never>? in
+            self.status = status
+            defer { self.continuation = nil }
+            return self.continuation
+        }
+        continuation?.resume(returning: status)
+    }
+}
+
 private final class ProcessLifecycle: @unchecked Sendable {
     private let process: Process
     private let lock = NSLock()
@@ -32,10 +63,6 @@ private final class ProcessLifecycle: @unchecked Sendable {
 
     init(process: Process) {
         self.process = process
-    }
-
-    var processIdentifier: Int32 {
-        lock.withLock { process.isRunning ? process.processIdentifier : 0 }
     }
 
     var didTimeOut: Bool { lock.withLock { timeoutTriggered } }
@@ -66,6 +93,12 @@ private final class ProcessLifecycle: @unchecked Sendable {
 }
 
 public final class OneShotProcessRunner: ProcessExecuting, Sendable {
+    private static let blockingIOQueue = DispatchQueue(
+        label: "com.lumaprofile.process-io",
+        qos: .utility,
+        attributes: .concurrent
+    )
+
     public let terminationGracePeriod: Duration
 
     public init(terminationGracePeriod: Duration = .seconds(2)) {
@@ -94,6 +127,10 @@ public final class OneShotProcessRunner: ProcessExecuting, Sendable {
         process.standardInput = stdinPipe
 
         let lifecycle = ProcessLifecycle(process: process)
+        let exitWaiter = ProcessExitWaiter()
+        process.terminationHandler = { terminatedProcess in
+            exitWaiter.processDidExit(with: terminatedProcess.terminationStatus)
+        }
         let startedAt = Date()
 
         do {
@@ -104,16 +141,11 @@ public final class OneShotProcessRunner: ProcessExecuting, Sendable {
             stdinPipe.fileHandleForWriting.closeFile()
             throw ProcessExecutionError.launchFailed(error.localizedDescription)
         }
-
         let stdoutTask = Task.detached(priority: .utility) {
-            stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            await Self.readToEndOfFile(stdoutPipe.fileHandleForReading)
         }
         let stderrTask = Task.detached(priority: .utility) {
-            stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        }
-        let exitTask = Task.detached(priority: .utility) {
-            process.waitUntilExit()
-            return process.terminationStatus
+            await Self.readToEndOfFile(stderrPipe.fileHandleForReading)
         }
 
         if let standardInput = request.standardInput, !standardInput.isEmpty {
@@ -125,17 +157,18 @@ public final class OneShotProcessRunner: ProcessExecuting, Sendable {
             Task.detached(priority: .utility) { [terminationGracePeriod] in
                 do {
                     try await Task.sleep(for: timeout)
-                    lifecycle.markTimedOutAndTerminate()
-                    try await Task.sleep(for: terminationGracePeriod)
-                    lifecycle.forceTerminateIfRunning()
                 } catch {
                     // Cancellation means the child exited before the deadline.
+                    return
                 }
+                lifecycle.markTimedOutAndTerminate()
+                try? await Task.sleep(for: terminationGracePeriod)
+                lifecycle.forceTerminateIfRunning()
             }
         }
 
         let exitCode: Int32 = await withTaskCancellationHandler {
-            await exitTask.value
+            await exitWaiter.wait()
         } onCancel: {
             lifecycle.markCancelledAndTerminate()
             Task.detached(priority: .utility) { [terminationGracePeriod] in
@@ -165,6 +198,14 @@ public final class OneShotProcessRunner: ProcessExecuting, Sendable {
             stdout: stdout,
             stderr: stderr
         )
+    }
+
+    private static func readToEndOfFile(_ handle: FileHandle) async -> Data {
+        await withCheckedContinuation { continuation in
+            blockingIOQueue.async {
+                continuation.resume(returning: handle.readDataToEndOfFile())
+            }
+        }
     }
 
     private func validate(_ request: ProcessRequest) throws {

@@ -3,8 +3,9 @@ set -euo pipefail
 
 script_directory="${0:A:h}"
 project_root="${script_directory:h}"
-version="${LUMAPROFILE_VERSION:-0.1.0}"
-build_number="${LUMAPROFILE_BUILD_NUMBER:-1}"
+info_plist="$project_root/App/LumaProfileApp/Info.plist"
+version="${LUMAPROFILE_VERSION:-$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$info_plist")}"
+build_number="${LUMAPROFILE_BUILD_NUMBER:-$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$info_plist")}"
 output_directory="${LUMAPROFILE_OUTPUT_DIRECTORY:-$project_root/outputs}"
 release_binary="${LUMAPROFILE_RELEASE_BINARY:-}"
 release_metadata_file="${LUMAPROFILE_RELEASE_METADATA_FILE:-}"

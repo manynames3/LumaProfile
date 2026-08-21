@@ -176,6 +176,7 @@ struct FileSessionStoreTests {
         let root = try TestSupport.makeTemporaryDirectory()
         defer { TestSupport.removeTemporaryDirectory(root) }
         let store = FileSessionStore(rootDirectory: root)
+        let concurrentReader = FileSessionStore(rootDirectory: root)
         let id = UUID()
         let session = CalibrationSession(id: id, state: .preflighting)
         let directory = try await store.create(session)
@@ -192,13 +193,24 @@ struct FileSessionStoreTests {
                 }
             }
             group.addTask {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
                 for _ in 0..<300 {
                     let data = try Data(contentsOf: sessionURL)
-                    let decoded = try decoder.decode(CalibrationSession.self, from: data)
-                    guard decoded.id == id else {
+                    guard
+                        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                        let encodedID = object["id"] as? String,
+                        UUID(uuidString: encodedID) == id
+                    else {
                         throw SyntheticTestError("Observed another session identity")
+                    }
+
+                    // A separate store actor exercises the production decoder while
+                    // the writer is replacing the canonical file. JSONDecoder's
+                    // built-in `.iso8601` strategy did not accept fractional seconds
+                    // on older Foundation versions, while the store intentionally
+                    // accepts both fractional and legacy whole-second timestamps.
+                    let decoded = try await concurrentReader.load(id: id)
+                    guard decoded.id == id else {
+                        throw SyntheticTestError("Store decoded another session identity")
                     }
                     await Task.yield()
                 }

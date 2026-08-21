@@ -52,8 +52,8 @@ Developer ID signing and notarization are a future release-hardening step. Apple
 Public portfolio artifacts use a guarded wrapper around the same byte-preserving local packager:
 
 ```sh
-LUMAPROFILE_VERSION=0.1.0 \
-LUMAPROFILE_BUILD_NUMBER=1 \
+LUMAPROFILE_VERSION=0.1.1 \
+LUMAPROFILE_BUILD_NUMBER=2 \
 Scripts/package-github-release.sh
 ```
 
