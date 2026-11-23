@@ -744,6 +744,8 @@ final class AppModel: ObservableObject {
         defer {
             measurementTask = nil
             whiteMeasurementSurface.dismiss()
+            // Put back the calibration of the profile macOS has associated.
+            CGDisplayRestoreColorSyncSettings()
             isMeasuring = false
             isLiveAdjusting = false
             endWorkflowActivity()
@@ -762,6 +764,12 @@ final class AppModel: ObservableObject {
                     await self?.cancelMeasurement()
                 }
             }
+            // Read the panel's own output. With a calibrated profile active, its
+            // calibration curve already pulls white to target, so the gauge
+            // would say "On target" while the monitor itself is still too
+            // bright. Calibration starts from this same uncorrected state.
+            // The identity table is temporary and affects only this display.
+            CGSetDisplayTransferByFormula(display.cgDisplayID, 0, 1, 1, 0, 1, 1, 0, 1, 1)
             var isFirstReading = true
             // Bounded so an unattended session cannot hold the meter forever.
             while !liveStopRequested, liveAdjustment.readingCount < 240 {

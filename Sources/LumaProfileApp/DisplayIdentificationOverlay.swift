@@ -221,7 +221,7 @@ private struct LiveAdjustmentGauge: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline, spacing: 20) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Luminance").lumaEyebrow()
+                    Text("Panel luminance, uncorrected").lumaEyebrow()
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(state.measurement.map { String(format: "%.1f", $0.luminanceCDM2) } ?? "—")
                             .font(Luma.heroNumeral)
