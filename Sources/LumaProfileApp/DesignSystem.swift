@@ -173,7 +173,7 @@ struct LumaChecklistToggleStyle: ToggleStyle {
             configuration.isOn.toggle()
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: configuration.isOn ? "checkmark.circle.fill" : "circle")
+                Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
                     .font(.system(size: 16))
                     .foregroundStyle(configuration.isOn ? Luma.positive : Color.secondary)
                 configuration.label

@@ -15,9 +15,12 @@ public enum ArgyllCommandBuilder {
 
     public static func spotMeasurement(
         installation: ArgyllInstallation,
-        request: SpotMeasurementRequest
+        request: SpotMeasurementRequest,
+        continuous: Bool = false
     ) throws -> ArgyllInvocation {
-        var arguments = ["-e", "-x", "-T", "-O"]
+        // `-O` exits after one reading. Without it spotread keeps the meter
+        // open and prompts again after every reading.
+        var arguments = ["-e", "-x", "-T"] + (continuous ? [] : ["-O"])
         arguments += try instrumentArguments(request.instrument)
         arguments += try correctionArguments(request.correction)
         arguments += spotreadMeasurementModeArguments(request.mode)

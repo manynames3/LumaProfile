@@ -337,6 +337,17 @@ final class AppModel: ObservableObject {
         displayWarmedUp && stableLighting && dynamicFeaturesDisabled && displayControlsReady
     }
 
+    var preparationItemsRemaining: Int {
+        [displayWarmedUp, stableLighting, dynamicFeaturesDisabled, displayControlsReady].filter { !$0 }.count
+    }
+
+    func confirmAllPreparationItems() {
+        displayWarmedUp = true
+        stableLighting = true
+        dynamicFeaturesDisabled = true
+        displayControlsReady = true
+    }
+
     var adjustmentIsReady: Bool {
         guard let measurement = preCalibrationMeasurement else { return false }
         let luminanceReady = currentTarget.luminanceCDM2.map {
@@ -476,7 +487,7 @@ final class AppModel: ObservableObject {
         guard preCalibrationMeasurement != nil else {
             return (
                 "Not measured yet",
-                "Place the meter near the display center; Measure White opens the full-screen white surface before reading.",
+                "Place the meter near the display center; Measure Once opens the full-screen white surface before reading.",
                 false
             )
         }
@@ -770,23 +781,12 @@ final class AppModel: ObservableObject {
             // bright. Calibration starts from this same uncorrected state.
             // The identity table is temporary and affects only this display.
             CGSetDisplayTransferByFormula(display.cgDisplayID, 0, 1, 1, 0, 1, 1, 0, 1, 1)
-            var isFirstReading = true
-            // Bounded so an unattended session cannot hold the meter forever.
-            while !liveStopRequested, liveAdjustment.readingCount < 240 {
-                let needsSettleDelay = isFirstReading
-                let task = Task {
-                    if needsSettleDelay {
-                        try await Task.sleep(for: .milliseconds(300))
-                    }
-                    try Task.checkCancellation()
-                    return try await measurementEngine.measure(request)
-                }
-                measurementTask = task
-                let measurement = try await task.value
-                isFirstReading = false
-                guard !liveStopRequested else { break }
-                preCalibrationMeasurement = measurement
-                liveAdjustment.record(measurement)
+            // Let the white surface and the identity curve settle first.
+            try await Task.sleep(for: .milliseconds(300))
+            guard !liveStopRequested else { return }
+            // One persistent meter session; readings arrive back to back.
+            try await measurementEngine.measureContinuously(request) { [weak self] measurement in
+                await self?.recordLiveReading(measurement) ?? false
             }
         } catch is CancellationError {
             // The operator finished adjusting.
@@ -794,6 +794,15 @@ final class AppModel: ObservableObject {
             // Stopping cancels the read in flight; that is not a failure.
             if !liveStopRequested { present(error, title: "Live reading stopped") }
         }
+    }
+
+    /// Returns whether the live session should take another reading.
+    private func recordLiveReading(_ measurement: Measurement) -> Bool {
+        guard !liveStopRequested else { return false }
+        preCalibrationMeasurement = measurement
+        liveAdjustment.record(measurement)
+        // Bounded so an unattended session cannot hold the meter forever.
+        return liveAdjustment.readingCount < 1_200
     }
 
     func cancelMeasurement() async {

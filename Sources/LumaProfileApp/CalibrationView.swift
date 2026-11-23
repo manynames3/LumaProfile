@@ -94,6 +94,11 @@ struct CalibrationView: View {
             }
             Spacer()
             if model.setupStep != .review {
+                if let blocker = continueBlocker {
+                    Label(blocker, systemImage: "arrow.up.circle.fill")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(Luma.caution)
+                }
                 Button("Continue") { model.moveToNextSetupStep() }
                     .buttonStyle(.lumaPrimary)
                     .controlSize(.large)
@@ -109,6 +114,20 @@ struct CalibrationView: View {
         case .target: true
         case .prepare: model.preparationStepReady
         case .review: false
+        }
+    }
+
+    /// Says what still blocks Continue, so a disabled button is never a mystery.
+    private var continueBlocker: String? {
+        guard !canContinueSetup else { return nil }
+        switch model.setupStep {
+        case .hardware:
+            return "Confirm the display and meter above to continue"
+        case .prepare:
+            let left = model.preparationItemsRemaining
+            return "Tick \(left) more \(left == 1 ? "box" : "boxes") above to continue"
+        case .target, .review:
+            return nil
         }
     }
 
@@ -382,11 +401,18 @@ struct CalibrationView: View {
     private var preparationChecklistSection: some View {
         LumaCard {
             VStack(alignment: .leading, spacing: 14) {
-                SectionHeader(
-                    title: "Prepare the display",
-                    subtitle: "These conditions keep the measurements stable and repeatable.",
-                    symbol: "checklist"
-                )
+                HStack(alignment: .top) {
+                    SectionHeader(
+                        title: "Tick each box when it's true",
+                        subtitle: "All four are needed before you can continue. They keep readings steady.",
+                        symbol: "checklist"
+                    )
+                    Spacer()
+                    if !model.preparationStepReady {
+                        Button("Tick All") { model.confirmAllPreparationItems() }
+                            .help("Confirms all four conditions at once.")
+                    }
+                }
                 Divider()
                 Toggle("Display has warmed up and stabilized", isOn: $model.displayWarmedUp)
                     .toggleStyle(.lumaChecklist)
@@ -397,7 +423,9 @@ struct CalibrationView: View {
                 Toggle("Display picture mode and hardware controls are ready", isOn: $model.displayControlsReady)
                     .toggleStyle(.lumaChecklist)
                 Label(
-                    model.preparationStepReady ? "Display preparation complete" : "Complete all four items before review",
+                    model.preparationStepReady
+                        ? "All four confirmed. You can continue."
+                        : "\(4 - model.preparationItemsRemaining) of 4 confirmed",
                     systemImage: model.preparationStepReady ? "checkmark.circle.fill" : "info.circle"
                 )
                 .font(.caption.weight(.medium))
@@ -424,16 +452,17 @@ struct CalibrationView: View {
                     }
                 }
                 HStack {
-                    Button(model.preCalibrationMeasurement == nil ? "Measure White" : "Measure Again") {
-                        Task { await model.captureQuickMeasurement(forAdjustment: true) }
-                    }
-                    .buttonStyle(.lumaPrimary)
-                    .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
                     Button("Adjust Live") {
                         Task { await model.startLiveAdjustment() }
                     }
+                    .buttonStyle(.lumaPrimary)
                     .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
                     .help("Keeps reading while you turn the monitor's own brightness and white-point controls toward the target.")
+                    Button("Measure Once") {
+                        Task { await model.captureQuickMeasurement(forAdjustment: true) }
+                    }
+                    .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
+                    .help("Takes a single white reading through the active profile.")
                     if model.isMeasuring {
                         ProgressView().controlSize(.small)
                         Button("Cancel", role: .cancel) { Task { await model.cancelMeasurement() } }
@@ -447,7 +476,7 @@ struct CalibrationView: View {
                         Label(guidance, systemImage: "dial.medium")
                     }
                 } else {
-                    Text("Optional, recommended. Remove the ambient diffuser and hang the meter flat at the center of the confirmed display. Measure White shows a full-screen white surface with a Cancel Reading control, and saves one reading as the Before white point.")
+                    Text("Optional, recommended. Remove the ambient diffuser and hang the meter flat at the center of the confirmed display. Adjust Live shows a full-screen white surface with a live gauge; Measure Once shows the same surface with a Cancel Reading control, and saves one reading as the Before white point.")
                         .lumaNote()
                 }
             }

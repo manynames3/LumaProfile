@@ -469,3 +469,102 @@ private final class ReloadCounter: @unchecked Sendable {
         lock.unlock()
     }
 }
+
+/// Synthetic stand-in for a persistent `spotread`: prompts, and answers every
+/// trigger with one reading followed by the next prompt.
+private actor LoopingSpotSession: InteractiveProcessSession {
+    private let stream: AsyncThrowingStream<InteractiveProcessEvent, Error>
+    private let continuation: AsyncThrowingStream<InteractiveProcessEvent, Error>.Continuation
+    private(set) var triggers = 0
+    private(set) var startedArguments: [String] = []
+    private(set) var cancelled = false
+
+    init() {
+        var captured: AsyncThrowingStream<InteractiveProcessEvent, Error>.Continuation?
+        stream = AsyncThrowingStream { captured = $0 }
+        continuation = captured!
+    }
+
+    var events: AsyncThrowingStream<InteractiveProcessEvent, Error> { stream }
+
+    func start(_ request: ProcessRequest) async throws {
+        startedArguments = request.arguments
+        prompt()
+    }
+
+    func respond(toPrompt identifier: String, with response: Data) async throws {
+        triggers += 1
+        let luminance = 100 + triggers
+        continuation.yield(.stdout(Data(
+            "\n Result is XYZ: 95.0 \(luminance).0 108.0, Yxy: \(luminance).0 0.3127 0.3290\n CCT = 6500K\n".utf8
+        )))
+        prompt()
+    }
+
+    func cancel() async {
+        cancelled = true
+        continuation.finish()
+    }
+
+    private func prompt() {
+        continuation.yield(.prompt(
+            identifier: ArgyllPromptIdentifier.takeReading.rawValue,
+            message: "synthetic take-reading prompt"
+        ))
+    }
+}
+
+@Suite
+struct ContinuousMeasurementTests {
+    @Test
+    func continuousMeasurementReusesOneSessionUntilTheCallerStops() async throws {
+        let root = try TestSupport.makeTemporaryDirectory()
+        defer { TestSupport.removeTemporaryDirectory(root) }
+        let bin = root.appending(path: "bin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let spotread = bin.appending(path: "spotread")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: spotread)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: spotread.path)
+        let session = LoopingSpotSession()
+        let engine = ArgyllCalibrationEngine(
+            locator: SyntheticArgyllLocator(
+                discovery: ArgyllInstallationDiscovery(
+                    installation: ArgyllInstallation(directory: bin, executables: [.spotread: spotread]),
+                    candidates: [],
+                    diagnostic: "Synthetic coherent ArgyllCMS installation."
+                )
+            ),
+            processExecutor: SyntheticDisplayListExecutor(),
+            interactiveSessionFactory: { session }
+        )
+        let readings = ReadingLog()
+
+        try await engine.measureContinuously(
+            SpotMeasurementRequest(instrument: TestSupport.instrument(id: "1"))
+        ) { measurement in
+            readings.append(measurement.luminanceCDM2) < 3
+        }
+
+        #expect(readings.values == [101, 102, 103])
+        #expect(await session.startedArguments.contains("-O") == false)
+        #expect(await session.cancelled)
+    }
+}
+
+private final class ReadingLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Double] = []
+
+    var values: [Double] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func append(_ value: Double) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        storage.append(value)
+        return storage.count
+    }
+}

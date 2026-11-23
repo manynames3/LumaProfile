@@ -27,6 +27,11 @@ public protocol CalibrationEngine: Sendable {
     func discoverInstruments() async throws -> [InstrumentDescriptor]
     func validateDisplayMapping(for display: PhysicalDisplay) async throws
     func measure(_ request: SpotMeasurementRequest) async throws -> Measurement
+    /// Takes readings back to back until `onReading` returns `false`.
+    func measureContinuously(
+        _ request: SpotMeasurementRequest,
+        onReading: @escaping @Sendable (Measurement) async -> Bool
+    ) async throws
     func calibrate(_ request: CalibrationRequest) -> AsyncThrowingStream<CalibrationEvent, Error>
     func characterize(_ request: CharacterizationRequest) -> AsyncThrowingStream<CharacterizationEvent, Error>
     func buildProfile(_ request: ProfileBuildRequest) async throws -> ICCProfileArtifact
@@ -34,6 +39,19 @@ public protocol CalibrationEngine: Sendable {
     func restoreActiveProfileCalibration(for display: PhysicalDisplay, sessionDirectory: URL) async throws
     func acknowledgeUserAction(id: String) async throws
     func cancelCurrentOperation() async
+}
+
+extension CalibrationEngine {
+    /// Fallback for engines without a persistent meter session.
+    public func measureContinuously(
+        _ request: SpotMeasurementRequest,
+        onReading: @escaping @Sendable (Measurement) async -> Bool
+    ) async throws {
+        while true {
+            let measurement = try await measure(request)
+            guard await onReading(measurement) else { return }
+        }
+    }
 }
 
 public protocol ProfileInstaller: Sendable {
