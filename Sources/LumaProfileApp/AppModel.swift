@@ -797,7 +797,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Returns whether the live session should take another reading.
-    private func recordLiveReading(_ measurement: Measurement) -> Bool {
+    private func recordLiveReading(_ measurement: LumaCore.Measurement) -> Bool {
         guard !liveStopRequested else { return false }
         preCalibrationMeasurement = measurement
         liveAdjustment.record(measurement)
