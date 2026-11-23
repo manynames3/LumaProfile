@@ -729,7 +729,7 @@ final class AppModel: ObservableObject {
             setupMeasurement: preCalibrationMeasurement,
             characterization: calibrationEffort.characterizationPreset,
             profileModel: profileModel,
-            profileDescription: "LumaProfile — \(display.name) — \(currentTarget.name)"
+            profileDescription: "\(display.name) — \(currentTarget.name) — \(CalibrationWorkflow.profileDateStamp(Date())) (LumaProfile)"
         )
 
         workflowSession = nil

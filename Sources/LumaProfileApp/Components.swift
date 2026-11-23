@@ -312,9 +312,11 @@ struct ProfileBeforeAfterView: View {
                     comparisonToggle
                 }
 
-                Text("Your current profile stays active. After is applied only when you confirm Activate & Verify After.")
-                    .lumaNote()
-                    .help("Generation leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT while measuring; LumaProfile restores the active profile's calibration when generation ends.")
+                if session.installation == nil {
+                    Text("Your current profile stays active. After is applied only when you confirm Activate & Verify After.")
+                        .lumaNote()
+                        .help("Generation leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT while measuring; LumaProfile restores the active profile's calibration when generation ends.")
+                }
 
                 if let attempt = session.activationVerificationAttempt,
                    attempt.status == .failed || attempt.status == .cancelled {

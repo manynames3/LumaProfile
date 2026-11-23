@@ -1369,3 +1369,23 @@ private struct SyntheticRecoverableInstallationFailure: LocalizedError, Sendable
 
     var errorDescription: String? { "synthetic activation readback failure" }
 }
+
+
+@Suite
+struct ProfileNamingTests {
+    @Test
+    func profileFilenameIncludesLocalDateAndCollapsesSeparators() throws {
+        let timeZone = try #require(TimeZone(identifier: "America/New_York"))
+        // 2026-11-23 04:39 UTC is still 22 November in New York.
+        let date = Date(timeIntervalSince1970: 1_795_408_740)
+
+        let name = CalibrationWorkflow.profileFilename(
+            displayName: "DELL S3221QS",
+            targetName: "sRGB / D65 / 120 / Gamma 2.2",
+            date: date,
+            timeZone: timeZone
+        )
+
+        #expect(name == "DELL-S3221QS-sRGB-D65-120-Gamma-2-2-2026-11-22.icc")
+    }
+}
