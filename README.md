@@ -1,8 +1,86 @@
+<div align="center">
+
 # LumaProfile
 
-LumaProfile is a native macOS 15 display-calibration prototype for Apple Silicon. Its SwiftUI app uses a four-step **Display & Meter → Target & Speed → Prepare → Review** setup, followed by guided calibration, characterization, and ICC profile creation. A completed run leaves the generated profile inactive until the operator explicitly confirms activation and verification. `LumaCore` owns the workflow and invokes the ArgyllCMS 3.5.0 toolchain bundled inside a packaged build.
+**Display calibration for Mac, done properly.**<br>
+A native macOS app that measures your screen with a colorimeter and builds a verified ICC profile, with no extra software to install.
 
-The packaged application is one install: users do not separately install ArgyllCMS or edit `PATH`. Downloaded Argyll archives are deliberately not committed to this source tree; the release scripts fetch and verify the pinned official binary and matching source archives. Instrument firmware, vendor software, and measurements from real hardware are not included. The app bundle includes a custom LumaProfile icon for Finder, the Dock, and the in-app About view.
+<br>
+
+<img src="docs/images/hardware.jpg" alt="LumaProfile running on a Mac mini with an X-Rite i1 Display Pro hanging on the screen" width="720">
+
+<sub>LumaProfile calibrating a Dell S3221QS with an X-Rite i1 Display Pro.</sub>
+
+</div>
+
+<br>
+
+## Why LumaProfile
+
+- **Guided, not cluttered.** Four steps: Display & Meter, Target & Speed, Prepare, Review. Nothing starts until the right screen is confirmed.
+- **See the difference.** A Before | After switch flips your display between the old and new profile so you can judge the result by eye.
+- **Set brightness first.** *Adjust Live* reads the panel every couple of seconds and tells you how far to raise or lower the monitor's own brightness before you calibrate.
+- **Verified, not assumed.** After activation, LumaProfile measures the result and rates it: average and 95th-percentile color error, white point, luminance, gamma and contrast.
+- **Safe by design.** Your previous profile is recorded first. Cancel, fail or quit, and it restores it. A recovery marker survives crashes and relaunches.
+- **One install.** ArgyllCMS 3.5.0 is bundled inside the app. No Terminal, no `PATH`, no admin password.
+- **Private.** Measurements, sessions and profiles stay in your user account. Nothing is uploaded.
+
+## A look inside
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/display.jpg" alt="Display and Meter step: identify the display and pick the i1Display Pro"></td>
+    <td width="50%"><img src="docs/images/target.jpg" alt="Target and Speed step: choose a preset and measurement effort"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>1. Display &amp; Meter</b><br>Identify the exact screen so the wrong one is never measured.</td>
+    <td align="center"><b>2. Target &amp; Speed</b><br>Pick an intent (Photo, Web sRGB, Video) and how thorough to be.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/prepare.jpg" alt="Prepare step with a live brightness and white point reading"></td>
+    <td width="50%"><img src="docs/images/history.jpg" alt="Session history showing an Excellent verification result"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>3. Prepare</b><br>Check brightness and white point before the longer profiling run.</td>
+    <td align="center"><b>4. Results &amp; History</b><br>Every session is kept with its verification and a shareable report.</td>
+  </tr>
+</table>
+
+## Measured result
+
+One real run on the author's own setup (Dell S3221QS, X-Rite i1 Display Pro, Quick effort, 119 patches, target sRGB / D65 / 120 cd/m² / gamma 2.2), verified after activation:
+
+| Average ΔE00 | 95th percentile | Maximum ΔE00 | White-point ΔE00 | Luminance | Gamma | Contrast |
+|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| **0.63** | 1.43 | 1.76 | 0.38 | 117.1 cd/m² | 2.20 | 1111:1 |
+
+LumaProfile rated this **Excellent** against its own published criteria. This is a single run on one display, not a benchmark against other software; results will vary with panel, meter and environment.
+
+## Get it
+
+There is no published release yet. To try it, build the disk image yourself (see [Build a one-install local package](#build-a-one-install-local-package)):
+
+```sh
+Scripts/fetch-argyllcms.sh
+swift build -c release --product LumaProfileApp
+Scripts/package-dmg.sh
+```
+
+Open the DMG and drag **LumaProfile** to **Applications**. Builds are ad-hoc signed and **not notarized**, so macOS may ask you to approve the app once (Finder: **Open**, or System Settings: **Privacy & Security**).
+
+**Needs:** an Apple Silicon Mac on macOS 15 or later, and an X-Rite i1Display Pro or Plus colorimeter connected over USB.
+
+**Tested on:** one Mac mini, one Dell S3221QS and one i1 Display Pro. Other displays and meters have not been through the hardware checklist, so treat them as unverified.
+
+## What's inside
+
+LumaProfile is a native macOS 15 SwiftUI app for Apple Silicon. Its four-step setup (**Display & Meter, Target & Speed, Prepare, Review**) leads into guided calibration, characterization and ICC profile creation. A completed run leaves the generated profile inactive until you explicitly confirm activation and verification. `LumaCore` owns the workflow and drives the ArgyllCMS 3.5.0 toolchain bundled inside a packaged build.
+
+The packaged app is one install: users do not separately install ArgyllCMS or edit `PATH`. Downloaded Argyll archives are deliberately not committed to this source tree; the release scripts fetch and verify the pinned official binary and matching source archives. Instrument firmware and vendor software are not included. The app bundle has a custom LumaProfile icon for Finder, the Dock and the About view.
+
+---
+
+# Documentation
 
 ## Requirements
 
@@ -134,7 +212,7 @@ Real hardware acceptance is intentionally separate; use [`docs/manual-hardware-a
 
 ## Known limitations
 
-- In one limited manual observation, a connected X-Rite i1Display Pro-family meter was enumerated by the bundled ArgyllCMS 3.5.0 tools and an exclusive open/initialization check reached the measurement prompt. This was not a completed acceptance run: no color reading or profile change occurred, so prompt timing, patch presentation, calibration accuracy, generation-only VideoLUT restoration, profile activation, disconnect handling, contention failure, and rollback still require the full on-device checklist.
+- Hardware acceptance so far covers one setup (Mac mini, Dell S3221QS, i1 Display Pro): detection, display mapping, white reading, a Quick calibration, profile build, Activate & Verify, cancel with Restore Before, the Before / After switch and Adjust Live. Meter unplug mid-run, force-quit recovery, sleep handling, other displays and other meters are not yet verified; see the checklist below.
 - Packaging validation proves archive identity, executable architecture/signatures, bundle sealing, and disk-image integrity; it does not prove live meter compatibility or calibration accuracy.
 - Argyll output can differ by version, instrument, locale, and mode. Unknown prompts fail closed rather than receiving an automatic response.
 - P0 targets a single directly attached physical display at a time; mirrored, virtual, Sidecar, AirPlay, HDR, and multi-display reconfiguration during a run are outside the validated path.
