@@ -52,7 +52,7 @@ Scripts/package-github-release.sh
 - [ ] Install the app from the mounted DMG and confirm the custom icon appears in Finder, the Dock, and **About & Licenses**; metadata validation alone does not prove macOS rendered it correctly.
 - [ ] Recompute the DMG SHA-256 and compare it with the emitted checksum file.
 
-## 5. Prepare—but do not automate—GitHub publication
+## 5. Prepare GitHub publication
 
 - [ ] Draft release notes that identify the exact tag/commit and list the DMG SHA-256.
 - [ ] Label the artifact **ad-hoc signed, not notarized, and not Gatekeeper-approved** near the download link.
@@ -65,7 +65,7 @@ Scripts/package-github-release.sh
 - [ ] Verify the public tag exposes the exact corresponding source and that the DMG also carries its required source/license bundle.
 - [ ] Test the downloaded artifacts again before marking the release current.
 
-This repository does not contain an automated publishing credential or release-upload workflow. Publishing remains an explicit maintainer action.
+Publishing remains an explicit maintainer action: pushing a branch named `release/vX.Y.Z` at the release commit runs `.github/workflows/release.yml`, which verifies the project, creates the tag, packages with the guarded wrapper on a GitHub macOS runner, and publishes a pre-release using `docs/releases/vX.Y.Z.md` as the notes. A runner-built DMG has not been installed on hardware; say so in the notes.
 
 ## 6. External Developer ID and notarization gate
 
