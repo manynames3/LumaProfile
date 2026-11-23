@@ -27,6 +27,7 @@ struct HistoryView: View {
                 }
                 .padding(.vertical, 4).tag(session.id)
             }
+            .scrollContentBackground(.hidden)
             .frame(minWidth: 260, idealWidth: 310)
             .overlay {
                 if model.sessions.isEmpty {
@@ -48,14 +49,14 @@ struct HistoryView: View {
         .safeAreaInset(edge: .top) {
             if !model.sessionLoadIssues.isEmpty {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Luma.caution)
                     Text("\(model.sessionLoadIssues.count) saved session record\(model.sessionLoadIssues.count == 1 ? "" : "s") could not be read. The folders were left untouched; reveal local data from Settings before deciding whether to remove them manually.")
                         .font(.caption)
                     Spacer()
                     Button("Reveal Local Data") { Task { await model.revealLocalData() } }
                 }
                 .padding(10)
-                .background(.orange.opacity(0.12))
+                .background(Luma.caution.opacity(0.12))
             }
         }
         .onAppear { if selection == nil { selection = model.sessions.first?.id } }
@@ -67,20 +68,20 @@ struct HistoryView: View {
     private func color(for session: CalibrationSession) -> Color {
         if session.activationVerificationAttempt?.status == .failed
             || session.activationVerificationAttempt?.status == .cancelled {
-            return .orange
+            return Luma.caution
         }
         if let rating = session.verificationAssessment?.rating {
             switch rating {
-            case .excellent: return .green
-            case .good: return .blue
-            case .needsAttention: return .orange
+            case .excellent: return Luma.positive
+            case .good: return Luma.info
+            case .needsAttention: return Luma.caution
             }
         }
         return switch session.state {
-        case .completed: .green
-        case .failed, .interrupted: .red
+        case .completed: Luma.positive
+        case .failed, .interrupted: Luma.critical
         case .cancelled: .secondary
-        default: .orange
+        default: Luma.caution
         }
     }
 
@@ -134,7 +135,7 @@ private struct SessionDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(session.display?.name ?? "Unknown display").font(.largeTitle.bold())
+                    Text(session.display?.name ?? "Unknown display").lumaDisplay()
                     Text(session.updatedAt.formatted(date: .long, time: .shortened)).foregroundStyle(.secondary)
                     HStack {
                         Button("Reveal Session Folder") { Task { await model.revealSession(session) } }
@@ -146,7 +147,7 @@ private struct SessionDetailView: View {
                     }
                     .padding(.top, 6)
                 }
-                GroupBox("Session") {
+                LumaCard("Session") {
                     Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
                         row("Status", session.state.rawValue.capitalized)
                         row("Meter", session.instrument?.model ?? "—")
@@ -167,15 +168,14 @@ private struct SessionDetailView: View {
                             row("Before restored", attempt.restoredBeforeProfile.map { $0 ? "Yes" : "No — After remains active" } ?? "Unconfirmed")
                             if let error = attempt.errorMessage { row("Attempt note", error) }
                         }
-                    }.padding(8)
-                }
-                if let report = session.verification {
-                    GroupBox("Verification") {
-                        VerificationMetricsView(report: report, assessment: session.verificationAssessment)
-                            .padding(8)
                     }
                 }
-                GroupBox("Artifacts") {
+                if let report = session.verification {
+                    LumaCard("Verification") {
+                        VerificationMetricsView(report: report, assessment: session.verificationAssessment)
+                    }
+                }
+                LumaCard("Artifacts") {
                     VStack(alignment: .leading, spacing: 10) {
                         if session.artifacts.isEmpty { Text("No artifacts recorded.").foregroundStyle(.secondary) }
                         ForEach(session.artifacts) { artifact in
@@ -189,7 +189,7 @@ private struct SessionDetailView: View {
                                 Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([artifact.url]) }
                             }
                         }
-                    }.padding(8)
+                    }
                 }
                 if session.profileBaseline != nil || session.artifacts.contains(where: {
                     $0.isComplete && $0.url.pathExtension.caseInsensitiveCompare("icc") == .orderedSame
@@ -197,7 +197,7 @@ private struct SessionDetailView: View {
                     ProfileBeforeAfterView(model: model, session: session)
                 }
             }
-            .padding(28).frame(maxWidth: 760, alignment: .leading)
+            .padding(Luma.pagePadding).frame(maxWidth: 760, alignment: .leading)
         }
         .confirmationDialog("Delete this session?", isPresented: $isConfirmingDeletion, titleVisibility: .visible) {
             Button("Delete Session and Artifacts", role: .destructive) {

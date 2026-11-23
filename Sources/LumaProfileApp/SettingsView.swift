@@ -34,7 +34,7 @@ struct SettingsView: View {
                 Button(model.explicitEnginePath.isEmpty ? "Check Bundled Engine" : "Apply Advanced Override") {
                     Task { await model.saveSettingsAndReloadEngine() }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.lumaPrimary)
                 .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments)
             } header: {
                 Text("Bundled Calibration Engine")
@@ -86,7 +86,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped).padding(.horizontal, 16)
+        .formStyle(.grouped).scrollContentBackground(.hidden).padding(.horizontal, 16)
         .navigationTitle("Settings")
         .fileImporter(isPresented: $isChoosingEngineDirectory, allowedContentTypes: [.folder], allowsMultipleSelection: false) { result in
             guard case .success(let urls) = result, let url = urls.first else { return }

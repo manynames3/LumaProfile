@@ -7,24 +7,38 @@ struct ContentView: View {
         NavigationSplitView {
             List(AppDestination.allCases, selection: $model.destination) { destination in
                 Label(destination.rawValue, systemImage: destination.symbol)
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(.vertical, 3)
                     .tag(destination)
             }
             .navigationTitle("LumaProfile")
+            .safeAreaInset(edge: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("LumaProfile")
+                        .font(.system(size: 17, weight: .semibold))
+                        .tracking(-0.2)
+                    Text("Display calibration").lumaEyebrow()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.top, 6)
+                .padding(.bottom, 10)
+            }
             .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Divider()
+                VStack(alignment: .leading, spacing: 8) {
                     StatusPill(
                         title: model.engineProbe.isAvailable ? "Engine ready" : "Engine unavailable",
                         isReady: model.engineProbe.isAvailable
                     )
                     Text(model.engineStatusSummary)
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
-                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
             }
-            .navigationSplitViewColumnWidth(min: 190, ideal: 220)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 228)
         } detail: {
             Group {
                 switch model.destination ?? .calibrate {
@@ -35,7 +49,9 @@ struct ContentView: View {
                 case .about: AboutView(model: model)
                 }
             }
+            .buttonStyle(.lumaSecondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Luma.canvas)
             .toolbar {
                 ToolbarItem {
                     Button {
@@ -47,6 +63,7 @@ struct ContentView: View {
                 }
             }
         }
+        .preferredColorScheme(.dark)
         .task { await model.load() }
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
