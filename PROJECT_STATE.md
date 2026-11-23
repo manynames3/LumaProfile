@@ -6,6 +6,7 @@
 - `LumaCore` contains domain models, color math, Argyll integration, persistence, and workflow behavior.
 - `LumaProfileApp` is the executable UI and depends on `LumaCore`.
 - P0 operates on one explicitly selected, directly attached physical display at a time.
+- The interface uses one in-repo design system (`DesignSystem.swift`): a fixed dark, hue-free neutral palette with a near-white accent so application chrome does not bias the operator's judgement of the measured display; colour is reserved for status.
 - The primary operator path is a four-step **Display & Meter**, **Target & Speed**, **Prepare**, and **Review** guide. The packaged app and About view use the checked-in custom `AppIcon.icns` rather than the generic executable icon.
 
 ## Bundled engine
