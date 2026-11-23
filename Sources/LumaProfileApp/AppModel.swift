@@ -934,6 +934,7 @@ final class AppModel: ObservableObject {
             try? await reloadSessions()
         } catch {
             protectedCleanupSessionIDs.insert(session.id)
+            statusMessage = "Restore Before failed: \(error.localizedDescription)"
             present(error, title: "Restore Before failed")
             try? await reloadSessions()
         }
@@ -1531,6 +1532,17 @@ final class AppModel: ObservableObject {
         }
         if displays.count == 1, engineDisplays.count == 1, let only = engineDisplays.first {
             displayNumber = String(only.index)
+            return
+        }
+
+        // The engine lists each display by its product name, so a single name
+        // match is unambiguous. This is only a suggestion: identification and
+        // explicit confirmation are still required before any measurement.
+        let named = engineDisplays.filter {
+            $0.description.localizedCaseInsensitiveContains(display.name)
+        }
+        if named.count == 1, let match = named.first {
+            displayNumber = String(match.index)
             return
         }
 

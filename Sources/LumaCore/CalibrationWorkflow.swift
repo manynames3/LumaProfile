@@ -507,7 +507,7 @@ public actor CalibrationWorkflow {
             )
             calibrationMayHaveChangedDisplay = false
             try await emit(
-                .message("The generated profile is inactive. LumaProfile left the ColorSync association unchanged, and ArgyllCMS reloaded calibration from the profile currently associated with the selected display."),
+                .message("The generated profile is inactive. LumaProfile left the ColorSync association unchanged, and calibration was reloaded from the profile currently associated with the selected display."),
                 session: &session,
                 continuation: continuation
             )

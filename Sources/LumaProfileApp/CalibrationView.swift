@@ -483,14 +483,21 @@ struct CalibrationView: View {
                 .textSelection(.enabled)
 
                 Divider()
-                ForEach(Array(model.preflightItems.enumerated()), id: \.offset) { _, item in
-                    HStack(alignment: .top) {
-                        Image(systemName: item.1 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                            .foregroundStyle(item.1 ? Luma.positive : Luma.caution)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading) {
-                            Text("\(item.0): \(item.1 ? "Ready" : "Needs attention")")
-                            if !item.1 { Text(item.2).font(.caption).foregroundStyle(.secondary) }
+                let pending = model.preflightItems.filter { !$0.1 }
+                if pending.isEmpty {
+                    Label("All \(model.preflightItems.count) readiness checks passed", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Luma.positive)
+                } else {
+                    ForEach(Array(pending.enumerated()), id: \.offset) { _, item in
+                        HStack(alignment: .top) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundStyle(Luma.caution)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(item.0): Needs attention")
+                                Text(item.2).lumaNote()
+                            }
                         }
                     }
                 }
