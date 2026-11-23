@@ -646,7 +646,7 @@ struct CalibrationWorkflowTests {
     }
 
     @Test
-    func restoreBeforeRefusesGenerationRecoveryAfterBaselineAssociationChanges() async throws {
+    func restoreBeforeResolvesGenerationRecoveryWithoutTouchingAChangedAssociation() async throws {
         let root = try TestSupport.makeTemporaryDirectory()
         defer { TestSupport.removeTemporaryDirectory(root) }
         let store = FileSessionStore(rootDirectory: root)
@@ -668,21 +668,18 @@ struct CalibrationWorkflowTests {
         )
         _ = try await store.create(session)
 
-        do {
-            _ = try await workflow.restoreBefore(session: session)
-            Issue.record("Expected changed baseline association to block recovery")
-        } catch CalibrationWorkflowError.baselineProfileAssociationChanged {
-            // Expected: neither the association nor VideoLUT was touched.
-        }
+        let recovered = try await workflow.restoreBefore(session: session)
 
-        #expect((await engine.snapshot()).restorationCount == 0)
+        // Only the current profile's calibration is reloaded; the association
+        // is left exactly as macOS has it.
+        #expect(recovered.state == .cancelled)
+        #expect((await engine.snapshot()).restorationCount == 1)
         let installerState = await installer.snapshot()
         #expect(installerState.prepareCount == 0)
         #expect(installerState.installCount == 0)
         #expect(installerState.rollbackCount == 0)
         let persisted = try await store.load(id: session.id)
-        #expect(persisted.state == .interrupted)
-        #expect(persisted.failureMessage == session.failureMessage)
+        #expect(persisted.state == .cancelled)
     }
 
     @Test

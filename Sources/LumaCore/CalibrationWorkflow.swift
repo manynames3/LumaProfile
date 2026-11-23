@@ -56,7 +56,6 @@ public enum CalibrationWorkflowError: LocalizedError, Sendable {
     case missingVerificationReport
     case activationRequiresCompletedSession
     case activationRecoveryRequired
-    case baselineProfileAssociationChanged
     case engineUnavailable(String)
     case instrumentUnavailable(String)
     case protectedStatePersistenceFailed(operationFailure: String, persistenceFailure: String)
@@ -93,8 +92,6 @@ public enum CalibrationWorkflowError: LocalizedError, Sendable {
             "Only a completed calibration profile can be activated."
         case .activationRecoveryRequired:
             "This session already has an incomplete or active profile operation. Restore the Before profile before trying again."
-        case .baselineProfileAssociationChanged:
-            "The selected display's ColorSync profile association changed after this session began. LumaProfile did not replace it; review the current profile before recovery."
         case .engineUnavailable(let diagnostic):
             diagnostic
         case .instrumentUnavailable(let diagnostic):
@@ -225,9 +222,12 @@ public actor CalibrationWorkflow {
             throw CalibrationWorkflowError.missingProfileBaseline
         }
         let currentProfile = try await installer.currentProfile(for: display)
-        guard sameProfileAssociation(currentProfile, baseline.activeProfileURL) else {
-            throw CalibrationWorkflowError.baselineProfileAssociationChanged
-        }
+        // A generation-only run never changes the association; it only loads a
+        // temporary VideoLUT. If something else has since changed the display's
+        // profile, there is nothing of ours to put back: reload the calibration
+        // of whatever macOS has associated now and say so, rather than leaving
+        // the session permanently unrecoverable.
+        let associationUnchanged = sameProfileAssociation(currentProfile, baseline.activeProfileURL)
         let directory = await store.sessionDirectory(for: original.id)
         try await engine.restoreActiveProfileCalibration(for: display, sessionDirectory: directory)
 
@@ -236,7 +236,9 @@ public actor CalibrationWorkflow {
         session.failureMessage = nil
         session.updatedAt = Date()
         try await store.append(
-            event: .message("Reloaded the calibration for the unchanged Before profile after the interrupted run."),
+            event: .message(associationUnchanged
+                ? "Reloaded the calibration for the unchanged Before profile after the interrupted run."
+                : "The display's profile was changed outside LumaProfile after this run began. Reloaded the calibration for the profile macOS has associated now; the Before profile was not re-applied."),
             sessionID: session.id
         )
         try await store.append(event: .stageChanged(.cancelled), sessionID: session.id)
