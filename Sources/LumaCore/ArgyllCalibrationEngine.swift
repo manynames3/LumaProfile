@@ -161,6 +161,90 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
         ).measurement
     }
 
+    /// Keeps one `spotread` process and one open meter for the whole run.
+    /// Launching a process per reading repeats instrument start-up each time,
+    /// which is most of the delay between readings.
+    public func measureContinuously(
+        _ request: SpotMeasurementRequest,
+        onReading: @escaping @Sendable (Measurement) async -> Bool
+    ) async throws {
+        let workflowID = try beginWorkflow()
+        defer { endWorkflow(workflowID) }
+        try validateInstrument(request.instrument)
+        try validateCorrection(request.correction)
+        let installation = try requireInstallation()
+        let invocation = try ArgyllCommandBuilder.spotMeasurement(
+            installation: installation,
+            request: request,
+            continuous: true
+        )
+        guard activeInteractiveSession == nil else {
+            throw ArgyllEngineError.invalidRequest("Another interactive ArgyllCMS process is active.")
+        }
+        let session = interactiveSessionFactory()
+        activeInteractiveSession = session
+        let events = await session.events
+        // Output since the last trigger: at most one reading.
+        var pending = Data()
+        var awaitingReading = false
+
+        do {
+            try await session.start(invocation.processRequest(
+                workingDirectoryURL: FileManager.default.temporaryDirectory,
+                timeout: .seconds(1_800)
+            ))
+            try await withTaskCancellationHandler {
+                readings: for try await event in events {
+                    try Task.checkCancellation()
+                    switch event {
+                    case .stdout(let data), .stderr(let data):
+                        try appendSpotMeasurementOutput(data, to: &pending)
+                    case .prompt(let identifier, let message):
+                        guard identifier == ArgyllPromptIdentifier.takeReading.rawValue else {
+                            if identifier == ArgyllPromptIdentifier.sensorPositionCorrection.rawValue {
+                                throw ArgyllEngineError.invalidRequest(
+                                    "Remove or rotate the i1Display ambient diffuser, place the sensor flat on the display, and try again. \(message)"
+                                )
+                            }
+                            throw ArgyllEngineError.invalidRequest(
+                                "Live readings stopped before sending input because ArgyllCMS requested another hardware action: \(message)"
+                            )
+                        }
+                        if awaitingReading {
+                            // A new prompt without a parsable reading means the
+                            // meter did not measure; the parser reports why.
+                            let measurement = try ArgyllSpotMeasurementParser.parse(
+                                String(decoding: pending, as: UTF8.self),
+                                version: cachedVersion,
+                                capturedAt: Date()
+                            ).measurement
+                            guard await onReading(measurement) else { break readings }
+                        }
+                        pending.removeAll(keepingCapacity: true)
+                        awaitingReading = true
+                        try await session.respond(
+                            toPrompt: identifier,
+                            with: ArgyllPromptStateMachine.nonInteractiveAcknowledgement
+                        )
+                    case .exited(let status):
+                        throw ArgyllEngineError.invalidRequest(
+                            "The meter session ended unexpectedly (exit \(status)). Reconnect the meter and try again."
+                        )
+                    }
+                }
+            } onCancel: {
+                Task { await session.cancel() }
+            }
+        } catch {
+            await session.cancel()
+            if activeCancellationRequested || error is CancellationError {
+                throw CancellationError()
+            }
+            throw error
+        }
+        await session.cancel()
+    }
+
     public nonisolated func calibrate(
         _ request: CalibrationRequest
     ) -> AsyncThrowingStream<CalibrationEvent, Error> {
