@@ -90,6 +90,10 @@ Only one application can usually own a meter at a time. Quit vendor calibration 
 11. Stop after generation if you only want the profile file. LumaProfile does not automatically install, activate, or verify it. A generation-only run keeps the original ColorSync association and asks ColorSync to reload the currently associated profile's calibration.
 12. To use the generated profile, choose **Activate & Verify After** and confirm the named display, Before profile, and candidate. LumaProfile validates the candidate again, installs it at user scope, verifies the ColorSync association, and then performs new verification measurements. A successful attempt leaves After active; cancellation or failure triggers an attempt to restore Before. Inspect Delta E, white point, luminance, gamma, warnings, and the raw technical log.
 
+## Before / After comparison
+
+Once a session has activated its After profile, the result card offers a **Before | After** switch with a neutral reference strip. Choosing **Before** temporarily points the same display back at the profile that was active when the run began so you can judge the change by eye; choosing **After** returns it. This is a viewing aid, not a rollback: the session stays recorded as activated, no file is removed, and LumaProfile puts After back before another profile-changing operation and before quitting. It refuses to switch if the display is on any profile other than those two. If the app is force-quit while Before is showing, the display stays on Before until you activate again or pick the profile in System Settings.
+
 ## Local data, privacy, and reports
 
 Measurements, generated profiles, imported correction copies, session JSON, event logs, and raw Argyll diagnostics remain in the current user's local account. Sessions and corrections are stored under `~/Library/Application Support/LumaProfile`; a candidate explicitly activated by the operator is copied under `~/Library/ColorSync/Profiles/LumaProfile`. LumaProfile does not require an account or upload calibration data. **Settings → Reveal Local Data** opens the app-managed data folder.

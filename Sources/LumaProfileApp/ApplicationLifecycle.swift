@@ -40,6 +40,14 @@ final class LumaProfileAppDelegate: NSObject, NSApplicationDelegate {
         guard let model = ApplicationRunGuard.shared.model else {
             return .terminateNow
         }
+        if model.isComparingBefore {
+            // A comparison left Before showing; put After back before quitting.
+            Task { @MainActor in
+                await model.restoreAfterIfComparing()
+                sender.reply(toApplicationShouldTerminate: !model.shouldGuardTermination)
+            }
+            return .terminateLater
+        }
         guard model.shouldGuardTermination else { return .terminateNow }
 
         if !model.hasFinishedInitialRecoveryAudit {

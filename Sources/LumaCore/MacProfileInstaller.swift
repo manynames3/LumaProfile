@@ -51,7 +51,7 @@ public struct ProfileActivationUnverifiedError: LocalizedError, Sendable, Profil
 
 /// Installs into the current user's ColorSync repository and associates only the
 /// explicitly selected display UUID. It never requests administrator privileges.
-public actor MacProfileInstaller: ProfileInstaller {
+public actor MacProfileInstaller: ProfileInstaller, ProfileComparisonSwitching {
     private let fileManager: FileManager
     private let inventory: any DisplayInventory
     private let profileDirectory: URL
@@ -212,6 +212,46 @@ public actor MacProfileInstaller: ProfileInstaller {
             throw ProfileInstallerError.rollbackFailed
         }
         await removeInstalledCandidateAfterSuccessfulRollback(record, for: display)
+    }
+
+    /// Moves the display between the two profiles this activation recorded so
+    /// the operator can compare them by eye. It refuses to act when the display
+    /// is currently on any other profile, never removes a file, and leaves the
+    /// session's activation record untouched.
+    public func showComparison(
+        _ side: ProfileComparisonSide,
+        record: ProfileInstallationRecord,
+        for display: PhysicalDisplay
+    ) async throws {
+        guard record.displayFingerprint == display.fingerprint else {
+            throw ProfileInstallerError.displayIdentityChanged
+        }
+        try await validateIdentity(of: display)
+        let currentURL = try await currentProfile(for: display)
+        guard sameAssociation(currentURL, record.installedProfileURL)
+            || sameAssociation(currentURL, record.previousProfileURL) else {
+            throw ProfileInstallerError.profileAssociationChanged
+        }
+
+        let targetURL: URL?
+        switch side {
+        case .before:
+            targetURL = record.previousProfileURL
+        case .after:
+            try validateProfile(at: record.installedProfileURL)
+            targetURL = record.installedProfileURL
+        }
+        if !sameAssociation(currentURL, targetURL) {
+            try setProfile(targetURL, for: display, failure: .associationFailed)
+        }
+        CGDisplayRestoreColorSyncSettings()
+        guard await verifyAssociation(
+            targetURL,
+            for: display,
+            disallowing: side == .before ? record.installedProfileURL : nil
+        ) else {
+            throw ProfileInstallerError.associationFailed
+        }
     }
 
     private func validateIdentity(of display: PhysicalDisplay) async throws {

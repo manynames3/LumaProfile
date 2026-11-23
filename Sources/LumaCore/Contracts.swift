@@ -47,6 +47,22 @@ public protocol ProfileInstaller: Sendable {
     func rollback(_ record: ProfileInstallationRecord, for display: PhysicalDisplay) async throws
 }
 
+/// Which of a session's two recorded profiles to show for a visual comparison.
+public enum ProfileComparisonSide: String, Sendable {
+    case before
+    case after
+}
+
+/// Temporarily switches a display between the Before and After profiles an
+/// activation recorded, without ending the activation or deleting either file.
+public protocol ProfileComparisonSwitching: Sendable {
+    func showComparison(
+        _ side: ProfileComparisonSide,
+        record: ProfileInstallationRecord,
+        for display: PhysicalDisplay
+    ) async throws
+}
+
 /// An installation error that means ColorSync may have changed the active
 /// association and the workflow must retain this record until rollback is
 /// verified.

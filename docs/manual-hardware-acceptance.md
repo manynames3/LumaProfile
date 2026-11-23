@@ -66,6 +66,12 @@ Do not paste personal home-directory paths or unrelated USB serial numbers into 
 - [ ] In History, **Export Report…** writes a user-selected plain-text file containing setup/After results, activation/restoration outcome, rating version/reasons, and artifact filenames. Confirm that it contains no raw log/Argyll transcript, meter serial, file hash, or absolute home-directory path.
 - [ ] An older session without the new durable fields or rating data is labeled as historical/not recorded in the exported report rather than receiving a guessed outcome.
 
+## Before / After comparison
+
+- [ ] After a verified activation, the **Before | After** switch changes only the selected display between the two recorded profiles, ColorSync readback matches each choice, and the reference strip visibly changes.
+- [ ] While Before is showing, starting another calibration, activation, Restore Before, or Quit first returns the display to After.
+- [ ] The switch is unavailable for sessions that are not currently recorded as activated, and it refuses to act when the display is on a third profile.
+
 ## Rollback fault injection
 
 Perform these checks with a deliberately disposable test profile, never the only known-good profile.

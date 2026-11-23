@@ -308,6 +308,10 @@ struct ProfileBeforeAfterView: View {
 
                 measuredWhiteComparison
 
+                if model.canCompare(session) || model.comparisonBeforeSessionID == session.id {
+                    comparisonToggle
+                }
+
                 Text("Your current profile stays active. After is applied only when you confirm Activate & Verify After.")
                     .lumaNote()
                     .help("Generation leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT while measuring; LumaProfile restores the active profile's calibration when generation ends.")
@@ -362,6 +366,38 @@ struct ProfileBeforeAfterView: View {
         } message: {
             Text(activationConfirmationMessage)
         }
+    }
+
+    private var comparisonToggle: some View {
+        let showingBefore = model.comparisonBeforeSessionID == session.id
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Text("Compare on display").lumaEyebrow()
+                Spacer()
+                if model.isSwitchingComparison {
+                    ProgressView().controlSize(.small)
+                }
+                Picker("Profile shown", selection: Binding(
+                    get: { showingBefore ? ProfileComparisonSide.before : .after },
+                    set: { side in
+                        Task { await model.setComparison(showBefore: side == .before, for: session) }
+                    }
+                )) {
+                    Text("Before").tag(ProfileComparisonSide.before)
+                    Text("After").tag(ProfileComparisonSide.after)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 200)
+                .disabled(model.isSwitchingComparison)
+            }
+            ComparisonReferenceStrip()
+            Text(showingBefore
+                ? "Showing Before temporarily. After is put back when you switch, start another operation, or quit."
+                : "Switch to Before to see the display as it was. This does not undo the activation.")
+                .lumaNote()
+        }
+        .lumaTile(padding: 14)
     }
 
     private var activationConfirmationMessage: String {
@@ -480,5 +516,44 @@ struct EmptyHardwareView: View {
         } actions: {
             Button("Refresh", action: refresh)
         }
+    }
+}
+
+
+/// Neutral ramp, grey steps and colour patches to judge a profile switch by eye.
+struct ComparisonReferenceStrip: View {
+    private static let patches: [Color] = [
+        Color(red: 0.80, green: 0.12, blue: 0.12),
+        Color(red: 0.90, green: 0.55, blue: 0.12),
+        Color(red: 0.92, green: 0.86, blue: 0.20),
+        Color(red: 0.20, green: 0.62, blue: 0.24),
+        Color(red: 0.14, green: 0.60, blue: 0.72),
+        Color(red: 0.16, green: 0.30, blue: 0.78),
+        Color(red: 0.52, green: 0.24, blue: 0.70),
+        Color(red: 0.86, green: 0.66, blue: 0.56),
+        Color(red: 0.55, green: 0.38, blue: 0.30),
+        Color(red: 0.36, green: 0.48, blue: 0.62),
+    ]
+
+    var body: some View {
+        VStack(spacing: 2) {
+            LinearGradient(colors: [.black, .white], startPoint: .leading, endPoint: .trailing)
+                .frame(height: 26)
+            HStack(spacing: 0) {
+                ForEach(0..<11, id: \.self) { step in
+                    Color(white: Double(step) / 10)
+                }
+            }
+            .frame(height: 26)
+            HStack(spacing: 0) {
+                ForEach(Array(Self.patches.enumerated()), id: \.offset) { _, patch in
+                    patch
+                }
+            }
+            .frame(height: 34)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityElement()
+        .accessibilityLabel("Reference ramp and colour patches for comparing profiles")
     }
 }

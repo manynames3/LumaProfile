@@ -206,6 +206,10 @@ final class AppModel: ObservableObject {
     }
     @Published var explicitEnginePath: String
     @Published var alert: AppAlert?
+    /// Set while a session's Before profile is temporarily shown for comparison.
+    @Published private(set) var comparisonBeforeSessionID: UUID?
+    @Published private(set) var isSwitchingComparison = false
+    private var comparisonContext: (record: ProfileInstallationRecord, display: PhysicalDisplay)?
 
     private var engine: any CalibrationEngine
     private let engineFactory: EngineFactory
@@ -707,6 +711,7 @@ final class AppModel: ObservableObject {
     }
 
     func startCalibration() async {
+        await restoreAfterIfComparing()
         guard isPreflightReady,
               let display = confirmedDisplay,
               let instrument = selectedInstrument
@@ -757,6 +762,7 @@ final class AppModel: ObservableObject {
     }
 
     func activateAndVerify(_ session: CalibrationSession) async {
+        await restoreAfterIfComparing()
         guard hasFinishedInitialRecoveryAudit else {
             alert = AppAlert(
                 title: "Recovery check incomplete",
@@ -895,7 +901,67 @@ final class AppModel: ObservableObject {
         beginAnotherCalibration()
     }
 
+    var isComparingBefore: Bool { comparisonBeforeSessionID != nil }
+
+    func canCompare(_ session: CalibrationSession) -> Bool {
+        session.installation?.activationStatus == .active
+            && session.display != nil
+            && installer is any ProfileComparisonSwitching
+            && hasFinishedInitialRecoveryAudit
+            && !requiresProtectedCleanupReview
+            && !hasActiveOperation
+            && !isRefreshing
+    }
+
+    /// Temporarily shows the session's Before or After profile on its display.
+    /// The session stays recorded as activated; After is put back before any
+    /// other profile-changing operation and before quitting.
+    func setComparison(showBefore: Bool, for session: CalibrationSession) async {
+        guard canCompare(session), !isSwitchingComparison,
+              let record = session.installation,
+              let display = session.display,
+              let switcher = installer as? any ProfileComparisonSwitching else { return }
+        if showBefore, let active = comparisonBeforeSessionID, active != session.id {
+            await restoreAfterIfComparing()
+        }
+        isSwitchingComparison = true
+        defer { isSwitchingComparison = false }
+        do {
+            try await switcher.showComparison(showBefore ? .before : .after, record: record, for: display)
+            if showBefore {
+                comparisonBeforeSessionID = session.id
+                comparisonContext = (record, display)
+            } else {
+                comparisonBeforeSessionID = nil
+                comparisonContext = nil
+            }
+        } catch {
+            present(error, title: "Comparison not switched")
+        }
+    }
+
+    /// Puts After back if a comparison left Before showing. The comparison is
+    /// always considered ended afterwards so a failure cannot trap the app.
+    func restoreAfterIfComparing() async {
+        guard let context = comparisonContext,
+              let switcher = installer as? any ProfileComparisonSwitching else {
+            comparisonBeforeSessionID = nil
+            comparisonContext = nil
+            return
+        }
+        isSwitchingComparison = true
+        defer { isSwitchingComparison = false }
+        do {
+            try await switcher.showComparison(.after, record: context.record, for: context.display)
+        } catch {
+            present(error, title: "After profile not restored after comparison")
+        }
+        comparisonBeforeSessionID = nil
+        comparisonContext = nil
+    }
+
     func rollback(_ session: CalibrationSession) async {
+        await restoreAfterIfComparing()
         guard !hasActiveOperation, !isRefreshing, !isRefreshingInstruments else {
             alert = AppAlert(
                 title: "Another operation is active",
