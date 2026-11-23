@@ -1,0 +1,74 @@
+name: Release
+
+# A maintainer starts a release on purpose by pushing a branch named
+# release/vX.Y.Z at the exact commit to ship. Nothing else triggers it.
+on:
+  push:
+    branches:
+      - "release/v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        shell: zsh {0}
+        run: |
+          version="${GITHUB_REF_NAME#release/v}"
+          plist_version="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - App/LumaProfileApp/Info.plist)"
+          [[ "$version" == "$plist_version" ]] || { print -u2 -- "Branch says $version but Info.plist says $plist_version"; exit 2 }
+          [[ -f "docs/releases/v$version.md" ]] || { print -u2 -- "Missing docs/releases/v$version.md"; exit 2 }
+          print -- "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify project
+        shell: zsh {0}
+        run: Scripts/ci/verify.sh
+
+      - name: Tag the release commit
+        shell: zsh {0}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rev-parse --verify "$tag^{commit}" >/dev/null 2>&1; then
+            [[ "$(git rev-parse "$tag^{commit}")" == "$(git rev-parse HEAD)" ]] || { print -u2 -- "$tag already points at another commit"; exit 2 }
+          else
+            git tag -a "$tag" -m "LumaProfile ${{ steps.version.outputs.version }}"
+            git push origin "$tag"
+          fi
+
+      - name: Package
+        shell: zsh {0}
+        run: |
+          Scripts/fetch-argyllcms.sh
+          swift build -c release --product LumaProfileApp
+          LUMAPROFILE_VERSION="${{ steps.version.outputs.version }}" Scripts/package-github-release.sh
+
+      - name: Publish pre-release
+        shell: zsh {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          base="outputs/LumaProfile-$version-arm64"
+          notes="$RUNNER_TEMP/notes.md"
+          cat "docs/releases/v$version.md" > "$notes"
+          print -- "\nSHA-256 of the DMG: \`$(cut -d' ' -f1 "$base.sha256")\`" >> "$notes"
+          gh release create "v$version" "$base.dmg" "$base.sha256" "$base.release.plist" \
+            --title "LumaProfile $version" --notes-file "$notes" --prerelease --verify-tag
