@@ -137,13 +137,12 @@ private struct SessionDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(session.display?.name ?? "Unknown display").lumaDisplay()
                     Text(session.updatedAt.formatted(date: .long, time: .shortened)).foregroundStyle(.secondary)
-                    HStack {
-                        Button("Reveal Session Folder") { Task { await model.revealSession(session) } }
-                        Button("Export Report…") { model.exportReport(for: session) }
-                            .disabled(model.hasActiveOperation)
-                        Button("Copy Diagnostics") { model.copyDiagnostics(for: session) }
-                        Button("Delete Session…", role: .destructive) { isConfirmingDeletion = true }
-                            .disabled(session.installation != nil || session.state == .interrupted)
+                    ViewThatFits(in: .horizontal) {
+                        HStack { inspectionActions; managementActions }
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack { inspectionActions }
+                            HStack { managementActions }
+                        }
                     }
                     .padding(.top, 6)
                 }
@@ -207,6 +206,20 @@ private struct SessionDetailView: View {
         } message: {
             Text("This permanently removes the session folder, logs, measurements, and generated candidate profile. It cannot be undone. Sessions that may be needed for profile restoration cannot be deleted here.")
         }
+    }
+
+    @ViewBuilder
+    private var inspectionActions: some View {
+        Button("Reveal Session Folder") { Task { await model.revealSession(session) } }
+        Button("Export Report…") { model.exportReport(for: session) }
+            .disabled(model.hasActiveOperation)
+    }
+
+    @ViewBuilder
+    private var managementActions: some View {
+        Button("Copy Diagnostics") { model.copyDiagnostics(for: session) }
+        Button("Delete Session…", role: .destructive) { isConfirmingDeletion = true }
+            .disabled(session.installation != nil || session.state == .interrupted)
     }
 
     private func row(_ label: String, _ value: String) -> some View {

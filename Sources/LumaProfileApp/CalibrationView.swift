@@ -564,19 +564,21 @@ private struct WorkflowView: View {
                     }
                 }
 
-                LumaCard {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let total = model.progressTotal, total > 0 {
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text("\(model.progressCompleted)").font(Luma.heroNumeral)
-                                Text("of \(total) \(progressUnit)").font(.system(size: 13)).foregroundStyle(.secondary)
-                            }
-                            LumaProgressBar(fraction: Double(model.progressCompleted) / Double(total))
-                        } else if model.isWorkflowRunning { ProgressView().controlSize(.small) }
-                        HStack(spacing: 0) {
-                            ForEach(Array(stages.enumerated()), id: \.element) { index, stage in
-                                stageNode(stage)
-                                if index < stages.count - 1 { Divider().frame(width: 34) }
+                if model.isWorkflowRunning {
+                    LumaCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            if let total = model.progressTotal, total > 0 {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text("\(model.progressCompleted)").font(Luma.heroNumeral)
+                                    Text("of \(total) \(progressUnit)").font(.system(size: 13)).foregroundStyle(.secondary)
+                                }
+                                LumaProgressBar(fraction: Double(model.progressCompleted) / Double(total))
+                            } else if model.isWorkflowRunning { ProgressView().controlSize(.small) }
+                            HStack(spacing: 0) {
+                                ForEach(Array(stages.enumerated()), id: \.element) { index, stage in
+                                    stageNode(stage)
+                                    if index < stages.count - 1 { Divider().frame(width: 34) }
+                                }
                             }
                         }
                     }

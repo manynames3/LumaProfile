@@ -117,6 +117,8 @@ struct LumaPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let large = controlSize == .large
         return configuration.label
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .font(.system(size: large ? 14 : 13, weight: .semibold))
             .foregroundStyle(Color.black.opacity(isEnabled ? 0.92 : 0.5))
             .padding(.horizontal, large ? 22 : 14)
@@ -137,6 +139,8 @@ struct LumaSecondaryButtonStyle: ButtonStyle {
         let large = controlSize == .large
         let tone: Color = configuration.role == .destructive ? Luma.critical : Color.primary
         return configuration.label
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .font(.system(size: large ? 14 : 13, weight: .medium))
             .foregroundStyle(tone.opacity(isEnabled ? 1 : 0.4))
             .padding(.horizontal, large ? 20 : 13)
