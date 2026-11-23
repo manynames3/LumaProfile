@@ -7,6 +7,7 @@ public enum ProcessExecutionError: Error, LocalizedError, Sendable {
     case invalidWorkingDirectory(URL)
     case launchFailed(String)
     case timedOut(Duration)
+    case standardInputClosed
     case cancelled
 
     public var errorDescription: String? {
@@ -19,8 +20,35 @@ public enum ProcessExecutionError: Error, LocalizedError, Sendable {
             return "The process could not be launched: \(message)"
         case .timedOut(let duration):
             return "The process exceeded its \(duration) timeout."
+        case .standardInputClosed:
+            return "The process stopped accepting input before the response could be delivered."
         case .cancelled:
             return "The process was cancelled."
+        }
+    }
+}
+
+/// Writing to a child whose read end has closed raises SIGPIPE, whose default
+/// action terminates the whole application. A calibration child can exit at any
+/// moment (meter unplugged, tool failure), so pipe writes must surface as
+/// ordinary errors instead.
+enum ChildPipe {
+    private static let brokenPipeSignalIgnored: Void = {
+        _ = signal(SIGPIPE, SIG_IGN)
+    }()
+
+    static func ignoreBrokenPipeSignal() {
+        _ = brokenPipeSignalIgnored
+    }
+
+    /// Writes `data`, throwing `standardInputClosed` rather than crashing when
+    /// the child has already closed its end.
+    static func write(_ data: Data, to handle: FileHandle) throws {
+        ignoreBrokenPipeSignal()
+        do {
+            try handle.write(contentsOf: data)
+        } catch {
+            throw ProcessExecutionError.standardInputClosed
         }
     }
 }
@@ -108,6 +136,7 @@ public final class OneShotProcessRunner: ProcessExecuting, Sendable {
     public func run(_ request: ProcessRequest) async throws -> ProcessResult {
         try Task.checkCancellation()
         try validate(request)
+        ChildPipe.ignoreBrokenPipeSignal()
 
         let process = Process()
         let stdoutPipe = Pipe()
@@ -149,9 +178,11 @@ public final class OneShotProcessRunner: ProcessExecuting, Sendable {
         }
 
         if let standardInput = request.standardInput, !standardInput.isEmpty {
-            stdinPipe.fileHandleForWriting.write(standardInput)
+            // A child that exits without draining its input is reported through
+            // its exit status, not by failing (or crashing) the write.
+            try? ChildPipe.write(standardInput, to: stdinPipe.fileHandleForWriting)
         }
-        stdinPipe.fileHandleForWriting.closeFile()
+        try? stdinPipe.fileHandleForWriting.close()
 
         let timeoutTask: Task<Void, Never>? = request.timeout.map { timeout in
             Task.detached(priority: .utility) { [terminationGracePeriod] in

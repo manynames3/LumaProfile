@@ -1,11 +1,17 @@
+import CoreGraphics
 import Foundation
 
 public typealias InteractiveProcessSessionFactory = @Sendable () -> any InteractiveProcessSession
+
+/// Reloads every display's calibration tables from the ColorSync profile
+/// macOS already associates with it. No association is changed.
+public typealias SystemCalibrationReloader = @Sendable () -> Void
 
 public final actor ArgyllCalibrationEngine: CalibrationEngine {
     private let locator: any ArgyllInstallationLocating
     private let processExecutor: any ProcessExecuting
     private let interactiveSessionFactory: InteractiveProcessSessionFactory
+    private let systemCalibrationReloader: SystemCalibrationReloader?
 
     private var cachedVersion: ArgyllVersion?
     private var activeWorkflowID: UUID?
@@ -20,6 +26,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
         self.locator = ArgyllInstallationLocator(explicitDirectory: explicitDirectory)
         self.processExecutor = processExecutor
         self.interactiveSessionFactory = { FoundationInteractiveProcessSession() }
+        self.systemCalibrationReloader = { CGDisplayRestoreColorSyncSettings() }
     }
 
     public init(
@@ -27,11 +34,13 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
         processExecutor: any ProcessExecuting = OneShotProcessRunner(),
         interactiveSessionFactory: @escaping InteractiveProcessSessionFactory = {
             FoundationInteractiveProcessSession()
-        }
+        },
+        systemCalibrationReloader: SystemCalibrationReloader? = nil
     ) {
         self.locator = locator
         self.processExecutor = processExecutor
         self.interactiveSessionFactory = interactiveSessionFactory
+        self.systemCalibrationReloader = systemCalibrationReloader
     }
 
     public func probe() async -> EngineProbe {
@@ -220,6 +229,26 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
             workingDirectory: directory,
             recordIn: directory
         )
+        if let systemCalibrationReloader {
+            // `dispwin -L` cannot read ICC v4 profiles, which is what macOS
+            // associates with most displays: on real hardware it reported
+            // "ICC V4 not supported", assumed a linear table and then failed to
+            // set it. ColorSync reads every profile macOS accepts, so the
+            // operating system reloads the calibration instead.
+            systemCalibrationReloader()
+            let logs = directory.appendingPathComponent("logs", isDirectory: true)
+            try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+            let note = "\(ISO8601DateFormatter().string(from: Date())) Asked ColorSync to reload display calibration from the currently associated profiles after validating Argyll display \(display.argyllDisplayIndex ?? 0).\n"
+            let noteURL = logs.appendingPathComponent("restore-videolut-colorsync.txt")
+            if let handle = try? FileHandle(forWritingTo: noteURL) {
+                defer { try? handle.close() }
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: Data(note.utf8))
+            } else {
+                try Data(note.utf8).write(to: noteURL, options: .atomic)
+            }
+            return
+        }
         let invocation = try ArgyllCommandBuilder.restoreActiveProfileCalibration(
             installation: installation,
             display: display

@@ -75,6 +75,23 @@ struct ProcessExecutionTests {
     }
 
     @Test
+    func testChildThatExitsWithoutReadingStandardInputDoesNotCrashTheParent() async throws {
+        let directory = try TestSupport.makeTemporaryDirectory()
+        defer { TestSupport.removeTemporaryDirectory(directory) }
+        // Far larger than a pipe buffer, so the write must outlive the child.
+        let request = ProcessRequest(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "exec 0<&-; exit 7"],
+            workingDirectoryURL: directory,
+            standardInput: Data(repeating: 0x41, count: 1_048_576)
+        )
+
+        let result = try await OneShotProcessRunner().run(request)
+
+        #expect(result.exitCode == 7)
+    }
+
+    @Test
     func testRejectsInvalidExecutableAndWorkingDirectoryBeforeLaunch() async throws {
         let directory = try TestSupport.makeTemporaryDirectory()
         defer { TestSupport.removeTemporaryDirectory(directory) }

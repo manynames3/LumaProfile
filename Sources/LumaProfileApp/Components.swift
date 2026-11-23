@@ -7,12 +7,20 @@ struct StatusPill: View {
     var isReady: Bool
 
     var body: some View {
-        Label(title, systemImage: isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(isReady ? .green : .orange)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(.quaternary, in: Capsule())
+        HStack(spacing: 7) {
+            Circle()
+                .fill(isReady ? Luma.positive : Luma.caution)
+                .frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.white.opacity(0.06), in: Capsule())
+        .overlay(Capsule().strokeBorder(Luma.hairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -22,14 +30,15 @@ struct SectionHeader: View {
     var symbol: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: symbol)
-                .font(.title2)
-                .foregroundStyle(.tint)
-                .frame(width: 28)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline)
-                Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                Text(title).font(Luma.title)
+                Text(subtitle).lumaNote()
             }
         }
     }
@@ -39,30 +48,42 @@ struct MeasurementCard: View {
     var measurement: LumaCore.Measurement
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 9) {
-            GridRow {
-                metric("Luminance", String(format: "%.1f cd/m²", measurement.luminanceCDM2))
-                metric("Color temperature", measurement.correlatedColorTemperature.map { "\(Int($0)) K" } ?? "—")
+        HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Luminance").lumaEyebrow()
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(String(format: "%.1f", measurement.luminanceCDM2))
+                        .font(Luma.heroNumeral)
+                    Text("cd/m²").font(.system(size: 13)).foregroundStyle(.secondary)
+                }
             }
-            GridRow {
-                metric("Chromaticity x", String(format: "%.4f", measurement.chromaticity.x))
-                metric("Chromaticity y", String(format: "%.4f", measurement.chromaticity.y))
-            }
-            GridRow {
-                metric("XYZ", String(format: "%.2f  %.2f  %.2f", measurement.xyz.x, measurement.xyz.y, measurement.xyz.z))
-                metric("Captured", measurement.capturedAt.formatted(date: .omitted, time: .standard))
+            .frame(minWidth: 190, alignment: .leading)
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 12) {
+                GridRow {
+                    LumaMetric(
+                        label: "Color temperature",
+                        value: measurement.correlatedColorTemperature.map { "\(Int($0)) K" } ?? "—",
+                        prominent: true
+                    )
+                    LumaMetric(
+                        label: "Chromaticity xy",
+                        value: String(format: "%.4f  %.4f", measurement.chromaticity.x, measurement.chromaticity.y),
+                        prominent: true
+                    )
+                }
+                GridRow {
+                    LumaMetric(
+                        label: "XYZ",
+                        value: String(format: "%.2f  %.2f  %.2f", measurement.xyz.x, measurement.xyz.y, measurement.xyz.z)
+                    )
+                    LumaMetric(
+                        label: "Captured",
+                        value: measurement.capturedAt.formatted(date: .omitted, time: .standard)
+                    )
+                }
             }
         }
-        .padding(14)
-        .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func metric(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.body.monospacedDigit())
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .lumaTile(padding: 16)
     }
 }
 
@@ -71,38 +92,48 @@ struct VerificationMetricsView: View {
     var assessment: VerificationAssessment? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            assessmentSummary
-            Grid(alignment: .leading, horizontalSpacing: 30, verticalSpacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 28) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Average ΔE00").lumaEyebrow()
+                    Text(String(format: "%.2f", report.metrics.averageDeltaE2000))
+                        .font(Luma.heroNumeral)
+                        .textSelection(.enabled)
+                }
+                .frame(minWidth: 150, alignment: .leading)
+                assessmentSummary
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Divider().overlay(Luma.hairline)
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 16) {
                 GridRow {
-                    resultMetric("Average ΔE00", report.metrics.averageDeltaE2000)
-                    resultMetric("95th percentile", report.metrics.percentile95DeltaE2000)
-                    resultMetric("Maximum ΔE00", report.metrics.maximumDeltaE2000)
+                    LumaMetric(label: "95th percentile", value: String(format: "%.2f", report.metrics.percentile95DeltaE2000), prominent: true)
+                    LumaMetric(label: "Maximum ΔE00", value: String(format: "%.2f", report.metrics.maximumDeltaE2000), prominent: true)
+                    LumaMetric(label: "White-point ΔE00", value: String(format: "%.2f", report.metrics.whitePointDeltaE2000), prominent: true)
                 }
                 GridRow {
-                    valueMetric("White-point ΔE00", String(format: "%.2f", report.metrics.whitePointDeltaE2000))
-                    valueMetric("Measured white", measuredWhiteText)
-                    valueMetric("Luminance", luminanceText)
+                    LumaMetric(label: "Measured white", value: measuredWhiteText)
+                    LumaMetric(label: "Luminance", value: luminanceText)
+                    LumaMetric(label: "Tone response", value: toneResponseText)
                 }
                 GridRow {
-                    valueMetric("Black level", report.metrics.blackLevelCDM2.map { String(format: "%.4f cd/m²", $0) } ?? "—")
-                    valueMetric("Contrast", report.metrics.contrastRatio.map { String(format: "%.0f:1", $0) } ?? "—")
-                    valueMetric("Tone response", toneResponseText)
+                    LumaMetric(label: "Black level", value: report.metrics.blackLevelCDM2.map { String(format: "%.4f cd/m²", $0) } ?? "—")
+                    LumaMetric(label: "Contrast", value: report.metrics.contrastRatio.map { String(format: "%.0f:1", $0) } ?? "—")
+                    LumaMetric(label: "Measured", value: report.measuredAt.formatted(date: .abbreviated, time: .shortened))
                 }
                 GridRow {
-                    valueMetric("Target RMS error", report.metrics.toneResponseRMSError.map { String(format: "%.4f", $0) } ?? "—")
-                    valueMetric("Power-fit RMS", report.metrics.gammaRMSError.map { String(format: "%.4f", $0) } ?? "—")
-                    valueMetric("Measured", report.measuredAt.formatted(date: .abbreviated, time: .shortened))
+                    LumaMetric(label: "Target RMS error", value: report.metrics.toneResponseRMSError.map { String(format: "%.4f", $0) } ?? "—")
+                    LumaMetric(label: "Power-fit RMS", value: report.metrics.gammaRMSError.map { String(format: "%.4f", $0) } ?? "—")
+                    Color.clear.frame(height: 1)
                 }
             }
             if !report.metrics.warnings.isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Warnings").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Warnings").lumaEyebrow()
                     ForEach(Array(report.metrics.warnings.enumerated()), id: \.offset) { _, warning in
                         Label(warning, systemImage: "exclamationmark.triangle")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Luma.caution)
                     }
                 }
             }
@@ -112,28 +143,25 @@ struct VerificationMetricsView: View {
     @ViewBuilder
     private var assessmentSummary: some View {
         if let assessment {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 6) {
                 Label(assessment.rating.rawValue, systemImage: ratingSymbol(assessment.rating))
-                    .font(.title2.bold())
+                    .font(Luma.title)
                     .foregroundStyle(ratingColor(assessment.rating))
                 ForEach(assessment.reasons, id: \.self) { reason in
-                    Text(reason)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Text(reason).lumaNote()
                 }
                 Text("Rated with verification criteria v\(assessment.criteriaVersion) on \(assessment.evaluatedAt.formatted(date: .abbreviated, time: .shortened)).")
-                    .font(.caption2)
+                    .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
-            Divider()
         } else {
-            Label("Measured result — no durable overall rating was recorded", systemImage: "info.circle")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-            Text("This is a legacy result. The measurements are shown without applying today's thresholds retroactively.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Divider()
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Measured result — no durable overall rating was recorded", systemImage: "info.circle")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("This is a legacy result. The measurements are shown without applying today's thresholds retroactively.")
+                    .lumaNote()
+            }
         }
     }
 
@@ -160,19 +188,11 @@ struct VerificationMetricsView: View {
         return "\(measured) / \(targetDescription)"
     }
 
-    private func resultMetric(_ title: String, _ value: Double) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(String(format: "%.2f", value)).font(.title3.monospacedDigit().weight(.semibold))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private func ratingColor(_ rating: VerificationRating) -> Color {
         switch rating {
-        case .excellent: .green
-        case .good: .blue
-        case .needsAttention: .orange
+        case .excellent: Luma.positive
+        case .good: Luma.info
+        case .needsAttention: Luma.caution
         }
     }
 
@@ -182,14 +202,6 @@ struct VerificationMetricsView: View {
         case .good: "checkmark.circle.fill"
         case .needsAttention: "exclamationmark.triangle.fill"
         }
-    }
-
-    private func valueMetric(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.monospacedDigit().weight(.semibold))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -219,16 +231,16 @@ struct ProfileBeforeAfterView: View {
             switch attempt.status {
             case .failed:
                 if attempt.restoredBeforeProfile == true {
-                    return ("Activation/verification failed; Before restored", .orange, "arrow.uturn.backward.circle.fill")
+                    return ("Activation/verification failed; Before restored", Luma.caution, "arrow.uturn.backward.circle.fill")
                 }
-                return ("Activation/verification failed; final profile state needs review", .red, "exclamationmark.triangle.fill")
+                return ("Activation/verification failed; final profile state needs review", Luma.critical, "exclamationmark.triangle.fill")
             case .cancelled:
                 if attempt.restoredBeforeProfile == true {
-                    return ("Activation/verification cancelled; Before restored", .orange, "arrow.uturn.backward.circle.fill")
+                    return ("Activation/verification cancelled; Before restored", Luma.caution, "arrow.uturn.backward.circle.fill")
                 }
-                return ("Activation/verification cancelled; final profile state needs review", .orange, "questionmark.circle.fill")
+                return ("Activation/verification cancelled; final profile state needs review", Luma.caution, "questionmark.circle.fill")
             case .inProgress:
-                return ("Activation/verification in progress", .orange, "clock.fill")
+                return ("Activation/verification in progress", Luma.caution, "clock.fill")
             case .verified:
                 break
             }
@@ -238,13 +250,13 @@ struct ProfileBeforeAfterView: View {
         }
         switch installation.activationStatus {
         case .active:
-            return ("Activated by this session", .green, "checkmark.circle.fill")
+            return ("Activated by this session", Luma.positive, "checkmark.circle.fill")
         case .activationPending:
-            return ("Activation attempted; final state unconfirmed", .orange, "questionmark.circle.fill")
+            return ("Activation attempted; final state unconfirmed", Luma.caution, "questionmark.circle.fill")
         case .restorationRequired:
-            return ("Restoration required; current state unconfirmed", .orange, "exclamationmark.triangle.fill")
+            return ("Restoration required; current state unconfirmed", Luma.caution, "exclamationmark.triangle.fill")
         @unknown default:
-            return ("Profile state unknown", .orange, "questionmark.circle.fill")
+            return ("Profile state unknown", Luma.caution, "questionmark.circle.fill")
         }
     }
 
@@ -269,7 +281,7 @@ struct ProfileBeforeAfterView: View {
     }
 
     var body: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
                     profileCard(
@@ -296,9 +308,15 @@ struct ProfileBeforeAfterView: View {
 
                 measuredWhiteComparison
 
-                Text("Generation leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT while measuring; LumaProfile restores the active profile's calibration when generation ends. The After profile is activated only after you confirm it below.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if model.canCompare(session) || model.comparisonBeforeSessionID == session.id {
+                    comparisonToggle
+                }
+
+                if session.installation == nil {
+                    Text("Your current profile stays active. After is applied only when you confirm Activate & Verify After.")
+                        .lumaNote()
+                        .help("Generation leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT while measuring; LumaProfile restores the active profile's calibration when generation ends.")
+                }
 
                 if let attempt = session.activationVerificationAttempt,
                    attempt.status == .failed || attempt.status == .cancelled {
@@ -315,7 +333,7 @@ struct ProfileBeforeAfterView: View {
                 HStack {
                     if canActivate {
                         Button("Activate & Verify After") { isConfirmingActivation = true }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.lumaPrimary)
                     }
                     if canRestore {
                         Button("Restore Before", role: .destructive) {
@@ -339,7 +357,6 @@ struct ProfileBeforeAfterView: View {
                     }
                 }
             }
-            .padding(8)
         } label: {
             Label("Profile Before / After", systemImage: "rectangle.split.2x1")
         }
@@ -353,6 +370,38 @@ struct ProfileBeforeAfterView: View {
         }
     }
 
+    private var comparisonToggle: some View {
+        let showingBefore = model.comparisonBeforeSessionID == session.id
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Text("Compare on display").lumaEyebrow()
+                Spacer()
+                if model.isSwitchingComparison {
+                    ProgressView().controlSize(.small)
+                }
+                Picker("Profile shown", selection: Binding(
+                    get: { showingBefore ? ProfileComparisonSide.before : .after },
+                    set: { side in
+                        Task { await model.setComparison(showBefore: side == .before, for: session) }
+                    }
+                )) {
+                    Text("Before").tag(ProfileComparisonSide.before)
+                    Text("After").tag(ProfileComparisonSide.after)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 200)
+                .disabled(model.isSwitchingComparison)
+            }
+            ComparisonReferenceStrip()
+            Text(showingBefore
+                ? "Showing Before temporarily. After is put back when you switch, start another operation, or quit."
+                : "Switch to Before to see the display as it was. This does not undo the activation.")
+                .lumaNote()
+        }
+        .lumaTile(padding: 14)
+    }
+
     private var activationConfirmationMessage: String {
         let displayName = session.display?.name ?? "the selected display"
         let afterName = generatedProfile?.url.lastPathComponent ?? "the generated profile"
@@ -361,8 +410,7 @@ struct ProfileBeforeAfterView: View {
 
     private var measuredWhiteComparison: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Measured white-patch comparison")
-                .font(.headline)
+            Text("Measured white-patch comparison").lumaEyebrow()
             HStack(spacing: 12) {
                 if let before = session.setupMeasurement {
                     whiteMeasurementCard(
@@ -407,8 +455,8 @@ struct ProfileBeforeAfterView: View {
         capturedAt: Date
     ) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            Text(String(format: "%.1f cd/m²", luminance)).font(.title3.monospacedDigit().weight(.semibold))
+            Text(title).lumaEyebrow()
+            Text(String(format: "%.1f cd/m²", luminance)).font(Luma.numeral)
             Text(String(format: "x %.4f · y %.4f", chromaticity.x, chromaticity.y))
                 .font(.caption.monospacedDigit())
             if let temperature {
@@ -418,19 +466,19 @@ struct ProfileBeforeAfterView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
-        .padding(10)
+        .padding(14)
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
-        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 9))
+        .background(Luma.raised, in: RoundedRectangle(cornerRadius: Luma.tileRadius, style: .continuous))
     }
 
     private func unavailableMeasurementCard(title: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            Text(detail).font(.subheadline).foregroundStyle(.secondary)
+            Text(title).lumaEyebrow()
+            Text(detail).font(.system(size: 13)).foregroundStyle(.secondary)
         }
-        .padding(10)
+        .padding(14)
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
-        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 9))
+        .background(Luma.raised, in: RoundedRectangle(cornerRadius: Luma.tileRadius, style: .continuous))
     }
 
     private func profileCard(
@@ -441,18 +489,18 @@ struct ProfileBeforeAfterView: View {
         color: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(title).font(.headline)
+            Text(title).lumaEyebrow()
             Text(filename)
-                .font(.body.monospaced())
+                .font(Luma.mono)
                 .lineLimit(2)
                 .textSelection(.enabled)
             Label(status, systemImage: symbol)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(color)
         }
-        .padding(12)
+        .padding(14)
         .frame(maxWidth: .infinity, minHeight: 100, alignment: .topLeading)
-        .background(.quaternary.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
+        .background(Luma.raised, in: RoundedRectangle(cornerRadius: Luma.tileRadius, style: .continuous))
     }
 }
 
@@ -470,5 +518,44 @@ struct EmptyHardwareView: View {
         } actions: {
             Button("Refresh", action: refresh)
         }
+    }
+}
+
+
+/// Neutral ramp, grey steps and colour patches to judge a profile switch by eye.
+struct ComparisonReferenceStrip: View {
+    private static let patches: [Color] = [
+        Color(red: 0.80, green: 0.12, blue: 0.12),
+        Color(red: 0.90, green: 0.55, blue: 0.12),
+        Color(red: 0.92, green: 0.86, blue: 0.20),
+        Color(red: 0.20, green: 0.62, blue: 0.24),
+        Color(red: 0.14, green: 0.60, blue: 0.72),
+        Color(red: 0.16, green: 0.30, blue: 0.78),
+        Color(red: 0.52, green: 0.24, blue: 0.70),
+        Color(red: 0.86, green: 0.66, blue: 0.56),
+        Color(red: 0.55, green: 0.38, blue: 0.30),
+        Color(red: 0.36, green: 0.48, blue: 0.62),
+    ]
+
+    var body: some View {
+        VStack(spacing: 2) {
+            LinearGradient(colors: [.black, .white], startPoint: .leading, endPoint: .trailing)
+                .frame(height: 26)
+            HStack(spacing: 0) {
+                ForEach(0..<11, id: \.self) { step in
+                    Color(white: Double(step) / 10)
+                }
+            }
+            .frame(height: 26)
+            HStack(spacing: 0) {
+                ForEach(Array(Self.patches.enumerated()), id: \.offset) { _, patch in
+                    patch
+                }
+            }
+            .frame(height: 34)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityElement()
+        .accessibilityLabel("Reference ramp and colour patches for comparing profiles")
     }
 }

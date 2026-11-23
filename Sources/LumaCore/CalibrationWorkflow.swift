@@ -507,7 +507,7 @@ public actor CalibrationWorkflow {
             )
             calibrationMayHaveChangedDisplay = false
             try await emit(
-                .message("The generated profile is inactive. LumaProfile left the ColorSync association unchanged, and ArgyllCMS reloaded calibration from the profile currently associated with the selected display."),
+                .message("The generated profile is inactive. LumaProfile left the ColorSync association unchanged, and calibration was reloaded from the profile currently associated with the selected display."),
                 session: &session,
                 continuation: continuation
             )
@@ -1046,9 +1046,31 @@ public actor CalibrationWorkflow {
     }
 
     private func profileFilename(for request: CalibrationWorkflowRequest) -> String {
+        Self.profileFilename(displayName: request.display.name, targetName: request.target.name, date: Date())
+    }
+
+    /// `Display-Target-YYYY-MM-DD.icc`, using the local calendar day so several
+    /// profiles for one display sort and read by when they were made.
+    static func profileFilename(
+        displayName: String,
+        targetName: String,
+        date: Date,
+        timeZone: TimeZone = .current
+    ) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
-        let display = request.display.name.unicodeScalars.map { allowed.contains($0) ? String($0) : "-" }.joined()
-        let target = request.target.name.unicodeScalars.map { allowed.contains($0) ? String($0) : "-" }.joined()
-        return "\(display)-\(target).icc"
+        func slug(_ text: String) -> String {
+            let mapped = text.unicodeScalars.map { allowed.contains($0) ? String($0) : "-" }.joined()
+            return mapped.split(separator: "-", omittingEmptySubsequences: true).joined(separator: "-")
+        }
+        return [slug(displayName), slug(targetName), profileDateStamp(date, timeZone: timeZone)]
+            .filter { !$0.isEmpty }
+            .joined(separator: "-") + ".icc"
+    }
+
+    public static func profileDateStamp(_ date: Date, timeZone: TimeZone = .current) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 }

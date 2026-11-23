@@ -27,11 +27,10 @@ struct CalibrationView: View {
 
     private var setupView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Create a trusted display profile").font(.largeTitle.bold())
-                    Text("Choose the exact display and meter, set a target, adjust the panel, then follow the guided measurement run.")
-                        .font(.title3).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Step \(model.setupStep.rawValue + 1) of \(CalibrationSetupStep.allCases.count)").lumaEyebrow()
+                    Text(model.setupStep.title).lumaDisplay()
                 }
                 if !model.engineProbe.isAvailable { engineUnavailableBanner }
                 setupStepper
@@ -53,30 +52,38 @@ struct CalibrationView: View {
                 .id(model.setupStep)
                 setupNavigation
             }
-            .padding(28)
-            .frame(maxWidth: 920, alignment: .leading)
+            .padding(Luma.pagePadding)
+            .frame(maxWidth: Luma.pageWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
     }
 
     private var setupStepper: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(CalibrationSetupStep.allCases.enumerated()), id: \.element) { index, step in
-                HStack(spacing: 8) {
-                    Image(systemName: step.rawValue < model.setupStep.rawValue ? "checkmark.circle.fill" : "\(step.rawValue + 1).circle.fill")
-                        .foregroundStyle(step.rawValue <= model.setupStep.rawValue ? Color.accentColor : .secondary)
-                    Text(step.title)
-                        .font(.subheadline.weight(step == model.setupStep ? .semibold : .regular))
-                        .foregroundStyle(step.rawValue <= model.setupStep.rawValue ? .primary : .secondary)
+        HStack(spacing: 10) {
+            ForEach(CalibrationSetupStep.allCases) { step in
+                let reached = step.rawValue <= model.setupStep.rawValue
+                VStack(alignment: .leading, spacing: 8) {
+                    Capsule()
+                        .fill(reached ? Luma.accent : Color.white.opacity(0.10))
+                        .frame(height: 3)
+                    HStack(spacing: 6) {
+                        if step.rawValue < model.setupStep.rawValue {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Luma.positive)
+                                .accessibilityHidden(true)
+                        }
+                        Text(step.title)
+                            .font(.system(size: 12, weight: step == model.setupStep ? .semibold : .regular))
+                            .foregroundStyle(reached ? .primary : .secondary)
+                    }
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Step \(step.rawValue + 1), \(step.title)\(step == model.setupStep ? ", current" : "")")
-                if index < CalibrationSetupStep.allCases.count - 1 {
-                    Divider().frame(width: 24)
-                }
             }
         }
-        .padding(14)
-        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+        .animation(.easeOut(duration: 0.2), value: model.setupStep)
     }
 
     private var setupNavigation: some View {
@@ -88,7 +95,7 @@ struct CalibrationView: View {
             Spacer()
             if model.setupStep != .review {
                 Button("Continue") { model.moveToNextSetupStep() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.lumaPrimary)
                     .controlSize(.large)
                     .keyboardShortcut(.rightArrow, modifiers: [.command])
                     .disabled(!canContinueSetup)
@@ -106,10 +113,10 @@ struct CalibrationView: View {
     }
 
     private var engineUnavailableBanner: some View {
-        GroupBox {
+        LumaCard {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "wrench.and.screwdriver.fill")
-                    .font(.title2).foregroundStyle(.orange)
+                    .font(.title2).foregroundStyle(Luma.caution)
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Calibration engine unavailable").font(.headline)
                     Text(model.engineStatusSummary).foregroundStyle(.secondary)
@@ -121,14 +128,14 @@ struct CalibrationView: View {
     }
 
     private var hardwareSection: some View {
-        GroupBox {
+        VStack(spacing: 16) {
+        LumaCard {
             VStack(alignment: .leading, spacing: 16) {
                 SectionHeader(
-                    title: "Display and meter",
-                    subtitle: "Identification and mapping are explicit to prevent measuring the wrong screen.",
+                    title: "Display",
+                    subtitle: "Identify and confirm the exact screen so the wrong one is never measured.",
                     symbol: "display"
                 )
-                Divider()
                 Picker("macOS display", selection: $model.selectedDisplayID) {
                     Text("Choose a display").tag(String?.none)
                     ForEach(model.displays) { display in
@@ -142,7 +149,7 @@ struct CalibrationView: View {
                 if model.selectedDisplay != nil {
                     LabeledContent("Measurement screen") {
                         Text(model.displayMappingSummary)
-                            .foregroundStyle(model.selectedEngineDisplay == nil ? .orange : .secondary)
+                            .foregroundStyle(model.selectedEngineDisplay == nil ? Luma.caution : .secondary)
                             .lineLimit(2)
                     }
                 }
@@ -153,17 +160,25 @@ struct CalibrationView: View {
                     .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.selectedDisplay == nil || (Int(model.displayNumber) ?? 0) <= 0)
                     if model.displayIdentified {
                         Label("Identifier shown", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Luma.positive)
                             .font(.caption.weight(.medium))
                     }
                     Spacer()
                 }
                 Text("A large identifier appears on the screen LumaProfile will measure. Confirm it is the physical display you selected.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .lumaNote()
                 Toggle("I confirmed this number identifies \(model.selectedDisplay?.name ?? "the selected display")", isOn: $model.displayMappingConfirmed)
+                    .toggleStyle(.lumaChecklist)
                     .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || !model.displayIdentified || model.selectedEngineDisplay == nil)
-
-                Divider()
+            }
+        }
+        LumaCard {
+            VStack(alignment: .leading, spacing: 16) {
+                SectionHeader(
+                    title: "Meter",
+                    subtitle: "A supported i1Display Pro / Plus colorimeter connected over USB.",
+                    symbol: "sensor"
+                )
                 Picker("Meter", selection: $model.selectedInstrumentID) {
                     Text("Choose an i1D3 meter").tag(String?.none)
                     ForEach(model.instruments) { instrument in
@@ -178,7 +193,7 @@ struct CalibrationView: View {
                         model.instruments.isEmpty ? "No supported USB meter detected" : "Meter ready — connection will be rechecked before every run",
                         systemImage: model.instruments.isEmpty ? "cable.connector.slash" : "cable.connector"
                     )
-                        .font(.caption).foregroundStyle(model.instruments.isEmpty ? .orange : .secondary)
+                        .font(.caption).foregroundStyle(model.instruments.isEmpty ? Luma.caution : .secondary)
                     Spacer()
                     Button("Refresh Meters") { Task { await model.refreshInstruments() } }
                         .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || !model.engineProbe.isAvailable)
@@ -219,7 +234,7 @@ struct CalibrationView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 ForEach(model.correctionCompatibilityIssues, id: \.self) { issue in
                                     Label(issue, systemImage: "exclamationmark.triangle.fill")
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(Luma.caution)
                                 }
                                 Toggle("I verified this correction is appropriate for this display and meter", isOn: $model.correctionCompatibilityConfirmed)
                             }
@@ -230,12 +245,12 @@ struct CalibrationView: View {
                 }
                 .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments)
             }
-            .padding(8)
+        }
         }
     }
 
     private var targetSection: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 16) {
                 SectionHeader(
                     title: "Calibration target",
@@ -247,30 +262,27 @@ struct CalibrationView: View {
                     ForEach(TargetChoice.allCases) { choice in Text(choice.title).tag(choice) }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
 
                 if model.targetChoice == .custom { customTargetEditor }
                 else { LabeledContent("Target", value: model.targetSummary) }
 
-                Picker("Measurement effort", selection: $model.calibrationEffort) {
+                Text("Measurement effort").lumaEyebrow()
+                HStack(spacing: 10) {
                     ForEach(CalibrationEffort.allCases, id: \.self) { effort in
-                        Text("\(effort.rawValue) · \(effort.characterizationPatchCount)")
-                            .tag(effort)
+                        LumaOptionTile(
+                            title: effort.rawValue,
+                            value: "\(effort.characterizationPatchCount)",
+                            caption: "characterization patches",
+                            isSelected: model.calibrationEffort == effort
+                        ) {
+                            model.calibrationEffort = effort
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
-                HStack {
-                    Text("Fewer patches · quicker")
-                    Spacer()
-                    Text("More patches · slower")
-                }
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                Text(model.calibrationEffort.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("The listed count covers characterization patches. Calibration adds its own readings, and verification is a separate optional pass after explicit activation. Time varies by meter mode, display behavior, and prompts.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(model.calibrationEffort.detail).lumaNote()
+                Text("Counts cover characterization only. Calibration and optional verification add their own readings, so run time varies.")
+                    .lumaNote()
                 DisclosureGroup("Advanced profile options") {
                     Picker("ICC profile model", selection: $model.profileModel) {
                         ForEach(ProfileModel.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -284,7 +296,6 @@ struct CalibrationView: View {
                     Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .padding(8)
         }
     }
 
@@ -369,7 +380,7 @@ struct CalibrationView: View {
     }
 
     private var preparationChecklistSection: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(
                     title: "Prepare the display",
@@ -378,22 +389,25 @@ struct CalibrationView: View {
                 )
                 Divider()
                 Toggle("Display has warmed up and stabilized", isOn: $model.displayWarmedUp)
+                    .toggleStyle(.lumaChecklist)
                 Toggle("Ambient lighting will remain stable", isOn: $model.stableLighting)
+                    .toggleStyle(.lumaChecklist)
                 Toggle("HDR, Night Shift, True Tone, auto-brightness, and dynamic contrast are off", isOn: $model.dynamicFeaturesDisabled)
+                    .toggleStyle(.lumaChecklist)
                 Toggle("Display picture mode and hardware controls are ready", isOn: $model.displayControlsReady)
+                    .toggleStyle(.lumaChecklist)
                 Label(
                     model.preparationStepReady ? "Display preparation complete" : "Complete all four items before review",
                     systemImage: model.preparationStepReady ? "checkmark.circle.fill" : "info.circle"
                 )
                 .font(.caption.weight(.medium))
-                .foregroundStyle(model.preparationStepReady ? .green : .secondary)
+                .foregroundStyle(model.preparationStepReady ? Luma.positive : .secondary)
             }
-            .padding(8)
         }
     }
 
     private var adjustmentSection: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(
                     title: "Check brightness and white point",
@@ -403,7 +417,7 @@ struct CalibrationView: View {
                 Divider()
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: model.adjustmentStatus.isReady ? "checkmark.circle.fill" : "dial.medium")
-                        .foregroundStyle(model.adjustmentStatus.isReady ? .green : .orange)
+                        .foregroundStyle(model.adjustmentStatus.isReady ? Luma.positive : Luma.caution)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(model.adjustmentStatus.title).font(.headline)
                         Text(model.adjustmentStatus.detail).font(.caption).foregroundStyle(.secondary)
@@ -413,8 +427,13 @@ struct CalibrationView: View {
                     Button(model.preCalibrationMeasurement == nil ? "Measure White" : "Measure Again") {
                         Task { await model.captureQuickMeasurement(forAdjustment: true) }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.lumaPrimary)
                     .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
+                    Button("Adjust Live") {
+                        Task { await model.startLiveAdjustment() }
+                    }
+                    .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
+                    .help("Keeps reading while you turn the monitor's own brightness and white-point controls toward the target.")
                     if model.isMeasuring {
                         ProgressView().controlSize(.small)
                         Button("Cancel", role: .cancel) { Task { await model.cancelMeasurement() } }
@@ -428,16 +447,15 @@ struct CalibrationView: View {
                         Label(guidance, systemImage: "dial.medium")
                     }
                 } else {
-                    Text("Recommended, but optional. Remove the ambient diffuser and hang the meter flat near the center of the confirmed display. When you choose Measure White, LumaProfile presents a full-screen RGB-white surface before triggering the meter and keeps it visible through the reading. A Cancel Reading control remains at the lower-right edge. This reading is saved as the measured Before white point for the results comparison.")
-                        .foregroundStyle(.secondary)
+                    Text("Optional, recommended. Remove the ambient diffuser and hang the meter flat at the center of the confirmed display. Measure White shows a full-screen white surface with a Cancel Reading control, and saves one reading as the Before white point.")
+                        .lumaNote()
                 }
             }
-            .padding(8)
         }
     }
 
     private var preflightSection: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(
                     title: "Review and start",
@@ -470,14 +488,21 @@ struct CalibrationView: View {
                 .textSelection(.enabled)
 
                 Divider()
-                ForEach(Array(model.preflightItems.enumerated()), id: \.offset) { _, item in
-                    HStack(alignment: .top) {
-                        Image(systemName: item.1 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                            .foregroundStyle(item.1 ? .green : .orange)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading) {
-                            Text("\(item.0): \(item.1 ? "Ready" : "Needs attention")")
-                            if !item.1 { Text(item.2).font(.caption).foregroundStyle(.secondary) }
+                let pending = model.preflightItems.filter { !$0.1 }
+                if pending.isEmpty {
+                    Label("All \(model.preflightItems.count) readiness checks passed", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Luma.positive)
+                } else {
+                    ForEach(Array(pending.enumerated()), id: \.offset) { _, item in
+                        HStack(alignment: .top) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundStyle(Luma.caution)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(item.0): Needs attention")
+                                Text(item.2).lumaNote()
+                            }
                         }
                     }
                 }
@@ -486,19 +511,18 @@ struct CalibrationView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(model.isPreflightReady ? "Ready to calibrate" : "Complete the checklist to continue").font(.headline)
-                        Text("Calibration leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT during measurement, then LumaProfile restores the active profile's calibration.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Your active profile is not switched. The display's calibration is adjusted temporarily during measurement, then restored.")
+                            .lumaNote()
                     }
                     Spacer()
                     Button("Start \(model.calibrationEffort.rawValue) Calibration") {
                         Task { await model.startCalibration() }
                     }
-                        .buttonStyle(.borderedProminent).controlSize(.large)
+                        .buttonStyle(.lumaPrimary).controlSize(.large)
                         .keyboardShortcut(.defaultAction)
                         .disabled(!model.isPreflightReady)
                 }
             }
-            .padding(8)
         }
     }
 }
@@ -519,8 +543,8 @@ private struct WorkflowView: View {
             VStack(alignment: .leading, spacing: 22) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(workflowTitle).font(.largeTitle.bold())
-                        Text(model.statusMessage).font(.title3).foregroundStyle(.secondary)
+                        Text(workflowTitle).lumaDisplay()
+                        Text(model.statusMessage).font(Luma.lead).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if model.isWorkflowRunning {
@@ -529,35 +553,40 @@ private struct WorkflowView: View {
                 }
 
                 if let action = model.requiredAction {
-                    GroupBox {
+                    LumaCard {
                         HStack(alignment: .top, spacing: 14) {
-                            Image(systemName: "hand.raised.fill").font(.title).foregroundStyle(.orange)
+                            Image(systemName: "hand.raised.fill").font(.title).foregroundStyle(Luma.caution)
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Your action is required").font(.headline)
                                 Text(action.message)
                                 HStack {
-                                    Button("Continue") { Task { await model.continueRequiredAction() } }.buttonStyle(.borderedProminent)
+                                    Button("Continue") { Task { await model.continueRequiredAction() } }.buttonStyle(.lumaPrimary)
                                     Button("Cancel Calibration", role: .destructive) { Task { await model.cancelCalibration() } }
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let total = model.progressTotal, total > 0 {
-                            ProgressView(value: Double(model.progressCompleted), total: Double(total))
-                            Text("\(model.progressCompleted) of \(total) \(progressUnit)").font(.caption).foregroundStyle(.secondary)
-                        } else if model.isWorkflowRunning { ProgressView() }
-                        HStack(spacing: 0) {
-                            ForEach(Array(stages.enumerated()), id: \.element) { index, stage in
-                                stageNode(stage)
-                                if index < stages.count - 1 { Divider().frame(width: 34) }
+                if model.isWorkflowRunning {
+                    LumaCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            if let total = model.progressTotal, total > 0 {
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text("\(model.progressCompleted)").font(Luma.heroNumeral)
+                                    Text("of \(total) \(progressUnit)").font(.system(size: 13)).foregroundStyle(.secondary)
+                                }
+                                LumaProgressBar(fraction: Double(model.progressCompleted) / Double(total))
+                            } else if model.isWorkflowRunning { ProgressView().controlSize(.small) }
+                            HStack(spacing: 0) {
+                                ForEach(Array(stages.enumerated()), id: \.element) { index, stage in
+                                    stageNode(stage)
+                                    if index < stages.count - 1 { Divider().frame(width: 34) }
+                                }
                             }
                         }
-                    }.padding(8)
+                    }
                 }
 
                 if session.state == .completed
@@ -580,7 +609,9 @@ private struct WorkflowView: View {
                     }.padding(.top, 8)
                 }
             }
-            .padding(28).frame(maxWidth: 920, alignment: .leading)
+            .padding(Luma.pagePadding)
+            .frame(maxWidth: Luma.pageWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -597,7 +628,7 @@ private struct WorkflowView: View {
 
     @ViewBuilder
     private var resultSection: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 16) {
                 if session.state == .completed {
                     if let attempt = session.activationVerificationAttempt,
@@ -610,8 +641,8 @@ private struct WorkflowView: View {
                                 ? "arrow.uturn.backward.circle.fill"
                                 : "exclamationmark.triangle.fill"
                         )
-                        .font(.title2.bold())
-                        .foregroundStyle(.orange)
+                        .font(Luma.title)
+                        .foregroundStyle(Luma.caution)
                         if let error = attempt.errorMessage {
                             Text(error).foregroundStyle(.secondary)
                         }
@@ -624,22 +655,22 @@ private struct WorkflowView: View {
                                 ? "checkmark.circle.fill"
                                 : "checkmark.seal.fill"
                         )
-                            .font(.title2.bold())
-                            .foregroundStyle(.green)
+                            .font(Luma.title)
+                            .foregroundStyle(Luma.positive)
                     } else {
                         Label("Profile generated — ColorSync association unchanged", systemImage: "doc.badge.checkmark")
-                            .font(.title2.bold())
-                            .foregroundStyle(.green)
+                            .font(Luma.title)
+                            .foregroundStyle(Luma.positive)
                     }
                 } else if session.state == .cancelled {
-                    Label("Calibration cancelled safely", systemImage: "xmark.circle").font(.title2.bold())
+                    Label("Calibration cancelled safely", systemImage: "xmark.circle").font(Luma.title)
                 } else if session.state == .interrupted {
                     Label("Profile recovery required", systemImage: "arrow.uturn.backward.circle.fill")
-                        .font(.title2.bold())
-                        .foregroundStyle(.orange)
+                        .font(Luma.title)
+                        .foregroundStyle(Luma.caution)
                     Text("LumaProfile could not confirm that Before was restored. Use Restore Before below before trying another activation.")
                 } else {
-                    Label("Calibration failed", systemImage: "exclamationmark.triangle.fill").font(.title2.bold()).foregroundStyle(.red)
+                    Label("Calibration failed", systemImage: "exclamationmark.triangle.fill").font(Luma.title).foregroundStyle(Luma.critical)
                     if let failure = session.failureMessage { Text(failure) }
                 }
                 if let report = session.verification {
@@ -676,7 +707,7 @@ private struct WorkflowView: View {
                     ProfileBeforeAfterView(model: model, session: session)
                 }
                 HStack {
-                    Button("New Calibration") { model.beginAnotherCalibration() }.buttonStyle(.borderedProminent)
+                    Button("New Calibration") { model.beginAnotherCalibration() }.buttonStyle(.lumaPrimary)
                     if session.activationVerificationAttempt?.status == .failed
                         || session.activationVerificationAttempt?.status == .cancelled
                         || session.verificationAssessment?.rating == .needsAttention {
@@ -686,7 +717,7 @@ private struct WorkflowView: View {
                     Button("View in History") { model.destination = .history }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading).padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -697,7 +728,7 @@ private struct WorkflowView: View {
         let active = session.state == stage
         return VStack(spacing: 6) {
             Image(systemName: done ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(active ? Color.accentColor : done ? .green : .secondary)
+                .foregroundStyle(active ? Luma.accent : done ? Luma.positive : .secondary)
             Text(shortName(stage)).font(.caption).foregroundStyle(active ? .primary : .secondary)
         }.frame(maxWidth: .infinity)
     }

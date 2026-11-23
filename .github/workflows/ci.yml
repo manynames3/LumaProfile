@@ -28,4 +28,16 @@ jobs:
           swift --version
 
       - name: Verify project
-        run: Scripts/ci/verify.sh
+        shell: zsh {0}
+        run: |
+          set -o pipefail
+          Scripts/ci/verify.sh 2>&1 | tee verify.log
+
+      - name: Surface failures as annotations
+        if: failure()
+        run: |
+          if [ -f verify.log ]; then
+            grep -E "error:|failed|Fatal|recorded an issue" verify.log | sort -u | head -n 40 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi

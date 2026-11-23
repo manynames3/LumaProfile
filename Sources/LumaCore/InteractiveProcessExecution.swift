@@ -240,7 +240,7 @@ public actor FoundationInteractiveProcessSession: InteractiveProcessSession {
             throw ArgyllEngineError.unsafePrompt("Rejected response for prompt identifier '\(identifier)'.")
         }
 
-        stdinHandle.write(response)
+        try ChildPipe.write(response, to: stdinHandle)
         promptMachine.didRespond(to: knownIdentifier)
         pendingPrompt = nil
     }

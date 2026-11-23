@@ -7,11 +7,11 @@ struct QuickMeterView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Quick Meter").font(.largeTitle.bold())
+                    Text("Quick Meter").lumaDisplay()
                     Text("Take a one-shot reading without starting a calibration session.")
-                        .font(.title3).foregroundStyle(.secondary)
+                        .font(Luma.lead).foregroundStyle(.secondary)
                 }
-                GroupBox {
+                LumaCard {
                     VStack(alignment: .leading, spacing: 14) {
                         SectionHeader(
                             title: "Measurement source",
@@ -28,7 +28,7 @@ struct QuickMeterView: View {
                             .foregroundStyle(.secondary)
                         HStack {
                             Button("Measure") { Task { await model.captureQuickMeasurement() } }
-                                .buttonStyle(.borderedProminent).controlSize(.large)
+                                .buttonStyle(.lumaPrimary).controlSize(.large)
                                 .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil || !model.engineProbe.isAvailable)
                             if model.isMeasuring {
                                 ProgressView().controlSize(.small)
@@ -37,17 +37,17 @@ struct QuickMeterView: View {
                             Spacer()
                             Button("Review Setup") { model.destination = .calibrate }
                         }
-                    }.padding(8)
+                    }
                 }
 
                 if let measurement = model.quickMeasurement {
-                    GroupBox("Latest reading") {
+                    LumaCard("Latest reading") {
                         VStack(alignment: .leading, spacing: 12) {
                             MeasurementCard(measurement: measurement)
                             ForEach(measurement.warnings, id: \.self) {
-                                Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+                                Label($0, systemImage: "exclamationmark.triangle").foregroundStyle(Luma.caution)
                             }
-                        }.padding(8)
+                        }
                     }
                 } else if !model.engineProbe.isAvailable {
                     EmptyHardwareView(
@@ -65,7 +65,7 @@ struct QuickMeterView: View {
                     ).frame(height: 260)
                 }
             }
-            .padding(28).frame(maxWidth: 860, alignment: .leading)
+            .padding(Luma.pagePadding).frame(maxWidth: 860, alignment: .leading)
         }
         .navigationTitle("Quick Meter")
     }

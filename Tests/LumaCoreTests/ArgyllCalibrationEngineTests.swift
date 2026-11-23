@@ -258,6 +258,57 @@ struct ArgyllCalibrationEngineTests {
     }
 
     @Test
+    func restoreActiveProfileCalibrationPrefersSystemReloadOverDispwinLoad() async throws {
+        let root = try TestSupport.makeTemporaryDirectory()
+        defer { TestSupport.removeTemporaryDirectory(root) }
+        let binaryDirectory = root.appending(path: "bin", directoryHint: .isDirectory)
+        let sessionDirectory = root.appending(path: "session", directoryHint: .isDirectory)
+        // Mirrors the shape seen on real hardware: listing works, `-L` fails.
+        let executable = try makeExecutable(
+            named: "dispwin",
+            in: binaryDirectory,
+            script: """
+            #!/bin/sh
+            if [ "$1" = "-?" ]; then
+                printf '%s\n' 'Test display patch window, Set Video LUTs, Install profiles, Version 3.5.0'
+                printf '%s\n' ' -d n Choose the display from the following list'
+                printf '%s\n' "    1 = 'Synthetic Display at 0, 0, width 3840, height 2160'"
+                exit 1
+            fi
+            printf '%s\n' 'Warning: ICC V4 not supported!' 'Dispwin: Error - Failed to set VideoLUTs' >&2
+            exit 1
+            """
+        )
+        let reloads = ReloadCounter()
+        let engine = ArgyllCalibrationEngine(
+            locator: SyntheticArgyllLocator(
+                discovery: ArgyllInstallationDiscovery(
+                    installation: ArgyllInstallation(
+                        directory: binaryDirectory,
+                        executables: [.dispwin: executable]
+                    ),
+                    candidates: [],
+                    diagnostic: "Synthetic coherent ArgyllCMS installation."
+                )
+            ),
+            systemCalibrationReloader: { reloads.increment() }
+        )
+
+        try await engine.restoreActiveProfileCalibration(
+            for: TestSupport.display(),
+            sessionDirectory: sessionDirectory
+        )
+
+        #expect(reloads.count == 1)
+        #expect(FileManager.default.fileExists(atPath: sessionDirectory.appending(
+            path: "logs/restore-videolut-colorsync.txt"
+        ).path))
+        #expect(!FileManager.default.fileExists(atPath: sessionDirectory.appending(
+            path: "logs/restore-videolut-dispwin.command.json"
+        ).path))
+    }
+
+    @Test
     func restoreActiveProfileCalibrationRejectsStaleDisplayMappingBeforeVideoLUTCommand() async throws {
         let root = try TestSupport.makeTemporaryDirectory()
         defer { TestSupport.removeTemporaryDirectory(root) }
@@ -399,5 +450,22 @@ private actor ControlledInteractiveProcessSession: InteractiveProcessSession {
         didExit = true
         continuation.yield(.exited(status))
         continuation.finish()
+    }
+}
+
+private final class ReloadCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func increment() {
+        lock.lock()
+        value += 1
+        lock.unlock()
     }
 }

@@ -38,11 +38,11 @@ struct AboutView: View {
     }
 
     private var privacyNotice: some View {
-        GroupBox {
+        LumaCard {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "lock.shield.fill")
                     .font(.title2)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Luma.info)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Local by default")
@@ -58,7 +58,6 @@ struct AboutView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
     }
 
@@ -69,7 +68,7 @@ struct AboutView: View {
                    let icon = NSImage(contentsOf: iconURL) {
                     Image(nsImage: icon).resizable()
                 } else {
-                    Image(systemName: "circle.lefthalf.filled").resizable().foregroundStyle(.tint)
+                    Image(systemName: "circle.lefthalf.filled").resizable().foregroundStyle(Luma.accent)
                 }
             }
             .scaledToFit()
@@ -77,7 +76,7 @@ struct AboutView: View {
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("LumaProfile")
-                    .font(.largeTitle.bold())
+                    .lumaDisplay()
                 Text(version)
                     .font(.title3)
                     .foregroundStyle(.secondary)
@@ -88,11 +87,11 @@ struct AboutView: View {
     }
 
     private var licenseNotice: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 12) {
                 Label("GNU AGPLv3-only", systemImage: "checkmark.seal.fill")
-                    .font(.title2.bold())
-                    .foregroundStyle(.tint)
+                    .font(Luma.title)
+                    .foregroundStyle(Luma.accent)
                 Text("LumaProfile is free software licensed only under version 3 of the GNU Affero General Public License (AGPL-3.0-only). You may copy, share, and modify it under that license's terms.")
                 legalDocumentButton(
                     localURL: documents.lumaProfileLicense,
@@ -107,16 +106,15 @@ struct AboutView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
     }
 
     private var warrantyNotice: some View {
-        GroupBox {
+        LumaCard {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.title2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Luma.caution)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("No warranty")
@@ -125,16 +123,15 @@ struct AboutView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
     }
 
     private var sourceNotice: some View {
-        GroupBox {
+        LumaCard {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .font(.title2)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Luma.positive)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Corresponding source included")
@@ -143,17 +140,16 @@ struct AboutView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
     }
 
     private var argyllNotice: some View {
-        GroupBox {
+        LumaCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 14) {
                     Image(systemName: "shippingbox.fill")
                         .font(.title2)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Luma.info)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Bundled ArgyllCMS 3.5.0")
@@ -186,7 +182,6 @@ struct AboutView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
         }
     }
 
@@ -202,7 +197,7 @@ struct AboutView: View {
                 systemImage: localURL == nil ? "arrow.up.right.square" : "doc.text"
             )
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.lumaPrimary)
     }
 }
 

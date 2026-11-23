@@ -6,6 +6,7 @@
 - `LumaCore` contains domain models, color math, Argyll integration, persistence, and workflow behavior.
 - `LumaProfileApp` is the executable UI and depends on `LumaCore`.
 - P0 operates on one explicitly selected, directly attached physical display at a time.
+- The interface uses one in-repo design system (`DesignSystem.swift`): a fixed dark, hue-free neutral palette with a near-white accent so application chrome does not bias the operator's judgement of the measured display; colour is reserved for status.
 - The primary operator path is a four-step **Display & Meter**, **Target & Speed**, **Prepare**, and **Review** guide. The packaged app and About view use the checked-in custom `AppIcon.icns` rather than the generic executable icon.
 
 ## Bundled engine
@@ -43,7 +44,7 @@
 ## Safety and recovery
 
 - The app runs without root privileges and installs profiles at user scope only after explicit confirmation.
-- Generation does not change the ColorSync profile association. Because Argyll temporarily loads the run's calibration into the selected display VideoLUT for measurement, a generation-only terminal path asks Argyll to reload calibration from the currently associated profile.
+- Generation does not change the ColorSync profile association. Because Argyll temporarily loads the run's calibration into the selected display VideoLUT for measurement, a generation-only terminal path asks ColorSync to reload calibration from the currently associated profile. `dispwin -L` is not used for this: on real hardware it could not read the ICC v4 profile macOS had associated and failed to set the VideoLUT.
 - The previously active profile is captured before any explicit activation.
 - Activation checks the selected display identity, candidate validity, and unchanged Before association, then confirms the resulting ColorSync association by readback before verification measurements begin.
 - Failure or cancellation after activation attempts idempotent restoration of the previous association and calibration for the same display fingerprint.

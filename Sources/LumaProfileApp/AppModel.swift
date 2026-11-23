@@ -206,6 +206,14 @@ final class AppModel: ObservableObject {
     }
     @Published var explicitEnginePath: String
     @Published var alert: AppAlert?
+    /// True while the live brightness and white-point gauge is taking readings.
+    @Published private(set) var isLiveAdjusting = false
+    let liveAdjustment = LiveAdjustmentState()
+    private var liveStopRequested = false
+    /// Set while a session's Before profile is temporarily shown for comparison.
+    @Published private(set) var comparisonBeforeSessionID: UUID?
+    @Published private(set) var isSwitchingComparison = false
+    private var comparisonContext: (record: ProfileInstallationRecord, display: PhysicalDisplay)?
 
     private var engine: any CalibrationEngine
     private let engineFactory: EngineFactory
@@ -700,13 +708,103 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Repeats the setup white reading on a full-screen white surface that shows
+    /// a live gauge, so the operator can turn the monitor's own brightness and
+    /// white-point controls toward the target before calibrating. Each completed
+    /// reading replaces the saved Before white reading.
+    func startLiveAdjustment() async {
+        guard !hasActiveOperation, !isRefreshing, !isRefreshingInstruments else { return }
+        guard engineProbe.isAvailable else {
+            alert = AppAlert(title: "Calibration engine unavailable", message: engineProbe.diagnostic)
+            return
+        }
+        guard let instrument = selectedInstrument else {
+            alert = AppAlert(title: "No supported meter", message: "Connect an i1Display Pro / Plus and refresh meter discovery.")
+            return
+        }
+        guard let display = confirmedDisplay else {
+            alert = AppAlert(title: "Display mapping required", message: "Select the macOS display and confirm its positive engine display number first.")
+            return
+        }
+
+        let targetTemperature: Double? = switch currentTarget.whitePoint {
+        case .d65: 6_500
+        case .temperature(let kelvin): kelvin
+        case .native, .chromaticity: nil
+        }
+        liveAdjustment.begin(
+            measurement: preCalibrationMeasurement,
+            targetLuminance: currentTarget.luminanceCDM2,
+            targetTemperature: targetTemperature
+        )
+        liveStopRequested = false
+        isMeasuring = true
+        isLiveAdjusting = true
+        beginWorkflowActivity(reason: "Adjusting the display with live meter readings")
+        defer {
+            measurementTask = nil
+            whiteMeasurementSurface.dismiss()
+            // Put back the calibration of the profile macOS has associated.
+            CGDisplayRestoreColorSyncSettings()
+            isMeasuring = false
+            isLiveAdjusting = false
+            endWorkflowActivity()
+        }
+        do {
+            let request = SpotMeasurementRequest(
+                instrument: instrument,
+                display: display,
+                correction: selectedCorrection,
+                mode: measurementMode
+            )
+            let measurementEngine = engine
+            displayIdentifier.dismiss()
+            try whiteMeasurementSurface.show(display: display, live: liveAdjustment) { [weak self] in
+                Task { @MainActor [weak self] in
+                    await self?.cancelMeasurement()
+                }
+            }
+            // Read the panel's own output. With a calibrated profile active, its
+            // calibration curve already pulls white to target, so the gauge
+            // would say "On target" while the monitor itself is still too
+            // bright. Calibration starts from this same uncorrected state.
+            // The identity table is temporary and affects only this display.
+            CGSetDisplayTransferByFormula(display.cgDisplayID, 0, 1, 1, 0, 1, 1, 0, 1, 1)
+            var isFirstReading = true
+            // Bounded so an unattended session cannot hold the meter forever.
+            while !liveStopRequested, liveAdjustment.readingCount < 240 {
+                let needsSettleDelay = isFirstReading
+                let task = Task {
+                    if needsSettleDelay {
+                        try await Task.sleep(for: .milliseconds(300))
+                    }
+                    try Task.checkCancellation()
+                    return try await measurementEngine.measure(request)
+                }
+                measurementTask = task
+                let measurement = try await task.value
+                isFirstReading = false
+                guard !liveStopRequested else { break }
+                preCalibrationMeasurement = measurement
+                liveAdjustment.record(measurement)
+            }
+        } catch is CancellationError {
+            // The operator finished adjusting.
+        } catch {
+            // Stopping cancels the read in flight; that is not a failure.
+            if !liveStopRequested { present(error, title: "Live reading stopped") }
+        }
+    }
+
     func cancelMeasurement() async {
+        liveStopRequested = true
         whiteMeasurementSurface.dismiss()
         measurementTask?.cancel()
         await engine.cancelCurrentOperation()
     }
 
     func startCalibration() async {
+        await restoreAfterIfComparing()
         guard isPreflightReady,
               let display = confirmedDisplay,
               let instrument = selectedInstrument
@@ -724,7 +822,7 @@ final class AppModel: ObservableObject {
             setupMeasurement: preCalibrationMeasurement,
             characterization: calibrationEffort.characterizationPreset,
             profileModel: profileModel,
-            profileDescription: "LumaProfile — \(display.name) — \(currentTarget.name)"
+            profileDescription: "\(display.name) — \(currentTarget.name) — \(CalibrationWorkflow.profileDateStamp(Date())) (LumaProfile)"
         )
 
         workflowSession = nil
@@ -757,6 +855,7 @@ final class AppModel: ObservableObject {
     }
 
     func activateAndVerify(_ session: CalibrationSession) async {
+        await restoreAfterIfComparing()
         guard hasFinishedInitialRecoveryAudit else {
             alert = AppAlert(
                 title: "Recovery check incomplete",
@@ -895,7 +994,67 @@ final class AppModel: ObservableObject {
         beginAnotherCalibration()
     }
 
+    var isComparingBefore: Bool { comparisonBeforeSessionID != nil }
+
+    func canCompare(_ session: CalibrationSession) -> Bool {
+        session.installation?.activationStatus == .active
+            && session.display != nil
+            && installer is any ProfileComparisonSwitching
+            && hasFinishedInitialRecoveryAudit
+            && !requiresProtectedCleanupReview
+            && !hasActiveOperation
+            && !isRefreshing
+    }
+
+    /// Temporarily shows the session's Before or After profile on its display.
+    /// The session stays recorded as activated; After is put back before any
+    /// other profile-changing operation and before quitting.
+    func setComparison(showBefore: Bool, for session: CalibrationSession) async {
+        guard canCompare(session), !isSwitchingComparison,
+              let record = session.installation,
+              let display = session.display,
+              let switcher = installer as? any ProfileComparisonSwitching else { return }
+        if showBefore, let active = comparisonBeforeSessionID, active != session.id {
+            await restoreAfterIfComparing()
+        }
+        isSwitchingComparison = true
+        defer { isSwitchingComparison = false }
+        do {
+            try await switcher.showComparison(showBefore ? .before : .after, record: record, for: display)
+            if showBefore {
+                comparisonBeforeSessionID = session.id
+                comparisonContext = (record, display)
+            } else {
+                comparisonBeforeSessionID = nil
+                comparisonContext = nil
+            }
+        } catch {
+            present(error, title: "Comparison not switched")
+        }
+    }
+
+    /// Puts After back if a comparison left Before showing. The comparison is
+    /// always considered ended afterwards so a failure cannot trap the app.
+    func restoreAfterIfComparing() async {
+        guard let context = comparisonContext,
+              let switcher = installer as? any ProfileComparisonSwitching else {
+            comparisonBeforeSessionID = nil
+            comparisonContext = nil
+            return
+        }
+        isSwitchingComparison = true
+        defer { isSwitchingComparison = false }
+        do {
+            try await switcher.showComparison(.after, record: context.record, for: context.display)
+        } catch {
+            present(error, title: "After profile not restored after comparison")
+        }
+        comparisonBeforeSessionID = nil
+        comparisonContext = nil
+    }
+
     func rollback(_ session: CalibrationSession) async {
+        await restoreAfterIfComparing()
         guard !hasActiveOperation, !isRefreshing, !isRefreshingInstruments else {
             alert = AppAlert(
                 title: "Another operation is active",
@@ -934,6 +1093,7 @@ final class AppModel: ObservableObject {
             try? await reloadSessions()
         } catch {
             protectedCleanupSessionIDs.insert(session.id)
+            statusMessage = "Restore Before failed: \(error.localizedDescription)"
             present(error, title: "Restore Before failed")
             try? await reloadSessions()
         }
@@ -1531,6 +1691,17 @@ final class AppModel: ObservableObject {
         }
         if displays.count == 1, engineDisplays.count == 1, let only = engineDisplays.first {
             displayNumber = String(only.index)
+            return
+        }
+
+        // The engine lists each display by its product name, so a single name
+        // match is unambiguous. This is only a suggestion: identification and
+        // explicit confirmation are still required before any measurement.
+        let named = engineDisplays.filter {
+            $0.description.localizedCaseInsensitiveContains(display.name)
+        }
+        if named.count == 1, let match = named.first {
+            displayNumber = String(match.index)
             return
         }
 

@@ -42,6 +42,7 @@ Do not paste personal home-directory paths or unrelated USB serial numbers into 
 - [ ] Spot measurement waits for explicit placement/continue input and produces plausible XYZ, xy, luminance, and warnings.
 - [ ] Cancelling at a placement prompt reaches a terminal cancelled state and leaves no complete artifact.
 - [ ] **Measure White** is optional and presents an opaque RGB-white surface on the confirmed physical display before the meter is triggered. It remains visible through the read, **Cancel Reading** closes it promptly, plausible brightness/white-point guidance follows, and exactly one timestamped setup reading persists; skipping it does not invent a Before reading or block calibration.
+- [ ] **Adjust Live** keeps the white surface up, updates the bottom-edge gauge after each reading, tracks changes made with the monitor's brightness control, and **Done** closes it promptly while keeping the last completed reading as the Before setup reading.
 - [ ] Measurement effort presents Quick as the default, shortest, explicitly lower-detail 119-patch choice; Balanced as the recommended 220-patch choice; Detailed as the longer, more-detailed 478-patch choice; and Reference as the longest Expert choice at 1,024 patches.
 - [ ] The generated characterization `.ti1` count matches the selected effort and retained session evidence. The UI identifies this as the characterization count, excludes calibration and optional verification readings, and does not promise a fixed number of minutes.
 - [ ] The patch window appears only on the selected display, at the requested geometry, without unrelated UI covering it.
@@ -65,6 +66,12 @@ Do not paste personal home-directory paths or unrelated USB serial numbers into 
 - [ ] A successful attempt persists **Verified**, activation/verification/finish timestamps, and **Before restored: No — After remains active**. Relaunching loads that outcome and the same artifact identities without treating the historical record as a fresh active-profile readback.
 - [ ] In History, **Export Report…** writes a user-selected plain-text file containing setup/After results, activation/restoration outcome, rating version/reasons, and artifact filenames. Confirm that it contains no raw log/Argyll transcript, meter serial, file hash, or absolute home-directory path.
 - [ ] An older session without the new durable fields or rating data is labeled as historical/not recorded in the exported report rather than receiving a guessed outcome.
+
+## Before / After comparison
+
+- [ ] After a verified activation, the **Before | After** switch changes only the selected display between the two recorded profiles, ColorSync readback matches each choice, and the reference strip visibly changes.
+- [ ] While Before is showing, starting another calibration, activation, Restore Before, or Quit first returns the display to After.
+- [ ] The switch is unavailable for sessions that are not currently recorded as activated, and it refuses to act when the display is on a third profile.
 
 ## Rollback fault injection
 
