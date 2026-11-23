@@ -206,6 +206,10 @@ final class AppModel: ObservableObject {
     }
     @Published var explicitEnginePath: String
     @Published var alert: AppAlert?
+    /// True while the live brightness and white-point gauge is taking readings.
+    @Published private(set) var isLiveAdjusting = false
+    let liveAdjustment = LiveAdjustmentState()
+    private var liveStopRequested = false
     /// Set while a session's Before profile is temporarily shown for comparison.
     @Published private(set) var comparisonBeforeSessionID: UUID?
     @Published private(set) var isSwitchingComparison = false
@@ -704,7 +708,88 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Repeats the setup white reading on a full-screen white surface that shows
+    /// a live gauge, so the operator can turn the monitor's own brightness and
+    /// white-point controls toward the target before calibrating. Each completed
+    /// reading replaces the saved Before white reading.
+    func startLiveAdjustment() async {
+        guard !hasActiveOperation, !isRefreshing, !isRefreshingInstruments else { return }
+        guard engineProbe.isAvailable else {
+            alert = AppAlert(title: "Calibration engine unavailable", message: engineProbe.diagnostic)
+            return
+        }
+        guard let instrument = selectedInstrument else {
+            alert = AppAlert(title: "No supported meter", message: "Connect an i1Display Pro / Plus and refresh meter discovery.")
+            return
+        }
+        guard let display = confirmedDisplay else {
+            alert = AppAlert(title: "Display mapping required", message: "Select the macOS display and confirm its positive engine display number first.")
+            return
+        }
+
+        let targetTemperature: Double? = switch currentTarget.whitePoint {
+        case .d65: 6_500
+        case .temperature(let kelvin): kelvin
+        case .native, .chromaticity: nil
+        }
+        liveAdjustment.begin(
+            measurement: preCalibrationMeasurement,
+            targetLuminance: currentTarget.luminanceCDM2,
+            targetTemperature: targetTemperature
+        )
+        liveStopRequested = false
+        isMeasuring = true
+        isLiveAdjusting = true
+        beginWorkflowActivity(reason: "Adjusting the display with live meter readings")
+        defer {
+            measurementTask = nil
+            whiteMeasurementSurface.dismiss()
+            isMeasuring = false
+            isLiveAdjusting = false
+            endWorkflowActivity()
+        }
+        do {
+            let request = SpotMeasurementRequest(
+                instrument: instrument,
+                display: display,
+                correction: selectedCorrection,
+                mode: measurementMode
+            )
+            let measurementEngine = engine
+            displayIdentifier.dismiss()
+            try whiteMeasurementSurface.show(display: display, live: liveAdjustment) { [weak self] in
+                Task { @MainActor [weak self] in
+                    await self?.cancelMeasurement()
+                }
+            }
+            var isFirstReading = true
+            // Bounded so an unattended session cannot hold the meter forever.
+            while !liveStopRequested, liveAdjustment.readingCount < 240 {
+                let needsSettleDelay = isFirstReading
+                let task = Task {
+                    if needsSettleDelay {
+                        try await Task.sleep(for: .milliseconds(300))
+                    }
+                    try Task.checkCancellation()
+                    return try await measurementEngine.measure(request)
+                }
+                measurementTask = task
+                let measurement = try await task.value
+                isFirstReading = false
+                guard !liveStopRequested else { break }
+                preCalibrationMeasurement = measurement
+                liveAdjustment.record(measurement)
+            }
+        } catch is CancellationError {
+            // The operator finished adjusting.
+        } catch {
+            // Stopping cancels the read in flight; that is not a failure.
+            if !liveStopRequested { present(error, title: "Live reading stopped") }
+        }
+    }
+
     func cancelMeasurement() async {
+        liveStopRequested = true
         whiteMeasurementSurface.dismiss()
         measurementTask?.cancel()
         await engine.cancelCurrentOperation()

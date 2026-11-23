@@ -429,6 +429,11 @@ struct CalibrationView: View {
                     }
                     .buttonStyle(.lumaPrimary)
                     .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
+                    Button("Adjust Live") {
+                        Task { await model.startLiveAdjustment() }
+                    }
+                    .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
+                    .help("Keeps reading while you turn the monitor's own brightness and white-point controls toward the target.")
                     if model.isMeasuring {
                         ProgressView().controlSize(.small)
                         Button("Cancel", role: .cancel) { Task { await model.cancelMeasurement() } }
