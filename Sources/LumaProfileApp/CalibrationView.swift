@@ -510,7 +510,7 @@ struct CalibrationView: View {
                         Text("\(model.calibrationEffort.rawValue) · \(model.calibrationEffort.characterizationPatchCount) characterization patches")
                     }
                     GridRow {
-                        Text("Activation").foregroundStyle(.secondary)
+                        Text("Switching On").foregroundStyle(.secondary)
                         Text("Manual after generation")
                     }
                 }
@@ -625,7 +625,7 @@ private struct WorkflowView: View {
                     resultSection
                 }
 
-                DisclosureGroup("Session log (\(model.logs.count))") {
+                DisclosureGroup("Activity log (\(model.logs.count))") {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(model.logs) { record in
                             HStack(alignment: .firstTextBaseline) {
@@ -652,7 +652,7 @@ private struct WorkflowView: View {
         case .completed: "Profile complete"
         case .failed: "Calibration failed"
         case .cancelled: "Calibration cancelled"
-        case .interrupted: "Profile recovery required"
+        case .interrupted: "This screen's profile needs fixing"
         default: "Calibration in progress"
         }
     }
@@ -666,8 +666,8 @@ private struct WorkflowView: View {
                        attempt.status == .failed || attempt.status == .cancelled {
                         Label(
                             attempt.restoredBeforeProfile == true
-                                ? "After attempt did not complete — Before restored"
-                                : "After attempt did not complete — profile state needs review",
+                                ? "The new profile wasn't switched on. Your screen is back on the old one."
+                                : "The new profile wasn't switched on. Check which profile is in use.",
                             systemImage: attempt.restoredBeforeProfile == true
                                 ? "arrow.uturn.backward.circle.fill"
                                 : "exclamationmark.triangle.fill"
@@ -680,8 +680,8 @@ private struct WorkflowView: View {
                     } else if session.installation?.activationStatus == .active {
                         Label(
                             session.verification == nil
-                                ? "After profile activated by this session"
-                                : "After profile activated and verified by this session",
+                                ? "Your screen is using the new profile"
+                                : "Your screen is using the new profile, and it was checked",
                             systemImage: session.verification == nil
                                 ? "checkmark.circle.fill"
                                 : "checkmark.seal.fill"
@@ -689,17 +689,17 @@ private struct WorkflowView: View {
                             .font(Luma.title)
                             .foregroundStyle(Luma.positive)
                     } else {
-                        Label("Profile generated — ColorSync association unchanged", systemImage: "doc.badge.checkmark")
+                        Label("New profile ready. Your screen is still using the old one.", systemImage: "doc.badge.checkmark")
                             .font(Luma.title)
                             .foregroundStyle(Luma.positive)
                     }
                 } else if session.state == .cancelled {
-                    Label("Calibration cancelled safely", systemImage: "xmark.circle").font(Luma.title)
+                    Label("Calibration cancelled. Nothing was changed.", systemImage: "xmark.circle").font(Luma.title)
                 } else if session.state == .interrupted {
-                    Label("Profile recovery required", systemImage: "arrow.uturn.backward.circle.fill")
+                    Label("This screen's profile needs fixing", systemImage: "arrow.uturn.backward.circle.fill")
                         .font(Luma.title)
                         .foregroundStyle(Luma.caution)
-                    Text("LumaProfile could not confirm that Before was restored. Use Restore Before below before trying another activation.")
+                    Text("LumaProfile isn't sure which profile this screen is using. Press Go Back to Old Profile below to fix it.")
                 } else {
                     Label("Calibration failed", systemImage: "exclamationmark.triangle.fill").font(Luma.title).foregroundStyle(Luma.critical)
                     if let failure = session.failureMessage { Text(failure) }
@@ -707,11 +707,11 @@ private struct WorkflowView: View {
                 if let report = session.verification {
                     VerificationMetricsView(report: report, assessment: session.verificationAssessment)
                 } else if session.state == .completed, session.installation == nil {
-                    Text("The generated candidate was not activated by this session. Activate it explicitly to run measured verification.")
+                    Text("The new profile is ready but not in use yet. Press Use & Check New Profile to switch to it and get an accuracy grade.")
                         .foregroundStyle(.secondary)
                 } else if session.state == .completed,
                           session.installation?.activationStatus == .active {
-                    Text("This session recorded an After activation, but it does not contain a completed verification report. The current ColorSync association may have changed since then.")
+                    Text("The new profile was switched on, but its accuracy was never checked. The screen's profile may have been changed since.")
                         .foregroundStyle(.secondary)
                 }
                 if let patchCount = session.actualCharacterizationPatchCount
@@ -770,7 +770,7 @@ private struct WorkflowView: View {
         case .characterizing: "Measure"
         case .buildingProfile: "Build"
         case .installingProfile: "Install"
-        case .verifying: "Verify"
+        case .verifying: "Check"
         case .completed: "Done"
         default: stage.rawValue
         }

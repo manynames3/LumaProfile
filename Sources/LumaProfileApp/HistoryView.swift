@@ -45,15 +45,15 @@ struct HistoryView: View {
             }
             .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle("Session History")
+        .navigationTitle("History")
         .safeAreaInset(edge: .top) {
             if !model.sessionLoadIssues.isEmpty {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Luma.caution)
-                    Text("\(model.sessionLoadIssues.count) saved session record\(model.sessionLoadIssues.count == 1 ? "" : "s") could not be read. The folders were left untouched; reveal local data from Settings before deciding whether to remove them manually.")
+                    Text("\(model.sessionLoadIssues.count) saved run\(model.sessionLoadIssues.count == 1 ? "" : "s") could not be read. The folders were left untouched; reveal local data from Settings before deciding whether to remove them manually.")
                         .font(.caption)
                     Spacer()
-                    Button("Reveal Local Data") { Task { await model.revealLocalData() } }
+                    Button("Show My Data in Finder") { Task { await model.revealLocalData() } }
                 }
                 .padding(10)
                 .background(Luma.caution.opacity(0.12))
@@ -85,12 +85,22 @@ struct HistoryView: View {
         }
     }
 
+    private func plainStatus(_ status: ActivationVerificationAttemptStatus) -> String {
+        switch status {
+        case .inProgress: "Switching on…"
+        case .verified: "Switched on and checked"
+        case .activated: "Switched on, not checked"
+        case .failed: "Couldn't be switched on"
+        case .cancelled: "Cancelled"
+        }
+    }
+
     private func statusTitle(for session: CalibrationSession) -> String {
         if let attempt = session.activationVerificationAttempt {
             switch attempt.status {
             case .failed: return attempt.restoredBeforeProfile == true ? "Attempt failed · restored" : "Attempt failed"
             case .cancelled: return attempt.restoredBeforeProfile == true ? "Cancelled · restored" : "Cancelled attempt"
-            case .inProgress: return "Activation in progress"
+            case .inProgress: return "Switching to the new profile…"
             case .verified, .activated: break
             }
         }
@@ -98,7 +108,7 @@ struct HistoryView: View {
         return switch session.state {
         case .completed: "Complete"
         case .failed: "Failed"
-        case .interrupted: "Recovery needed"
+        case .interrupted: "Needs fixing"
         case .cancelled: "Cancelled"
         default: "In progress"
         }
@@ -163,14 +173,14 @@ private struct SessionDetailView: View {
                             row("Generated", generatedAt.formatted(date: .abbreviated, time: .shortened))
                         }
                         if let attempt = session.activationVerificationAttempt {
-                            row("After attempt", attempt.status.rawValue.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).capitalized)
-                            row("Before restored", attempt.restoredBeforeProfile.map { $0 ? "Yes" : "No — After remains active" } ?? "Unconfirmed")
-                            if let error = attempt.errorMessage { row("Attempt note", error) }
+                            row("New profile", plainStatus(attempt.status))
+                            row("Back on old profile", attempt.restoredBeforeProfile.map { $0 ? "Yes" : "No, the new profile is in use" } ?? "Unconfirmed")
+                            if let error = attempt.errorMessage { row("Note", error) }
                         }
                     }
                 }
                 if let report = session.verification {
-                    LumaCard("Verification") {
+                    LumaCard("Accuracy Check") {
                         VerificationMetricsView(report: report, assessment: session.verificationAssessment)
                     }
                 }
@@ -185,7 +195,7 @@ private struct SessionDetailView: View {
                                     Text(artifact.url.lastPathComponent).font(.caption.monospaced()).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([artifact.url]) }
+                                Button("Show") { NSWorkspace.shared.activateFileViewerSelecting([artifact.url]) }
                             }
                         }
                     }
@@ -199,26 +209,26 @@ private struct SessionDetailView: View {
             .padding(Luma.pagePadding).frame(maxWidth: 760, alignment: .leading)
         }
         .confirmationDialog("Delete this session?", isPresented: $isConfirmingDeletion, titleVisibility: .visible) {
-            Button("Delete Session and Artifacts", role: .destructive) {
+            Button("Delete This Run and Its Files", role: .destructive) {
                 Task { await model.deleteSession(session) }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This permanently removes the session folder, logs, measurements, and generated candidate profile. It cannot be undone. Sessions that may be needed for profile restoration cannot be deleted here.")
+            Text("This permanently removes this run's folder, logs, measurements, and the new profile. It cannot be undone. Runs that may be needed to put a profile back cannot be deleted here.")
         }
     }
 
     @ViewBuilder
     private var inspectionActions: some View {
-        Button("Reveal Session Folder") { Task { await model.revealSession(session) } }
+        Button("Show Files") { Task { await model.revealSession(session) } }
         Button("Export Report…") { model.exportReport(for: session) }
             .disabled(model.hasActiveOperation)
     }
 
     @ViewBuilder
     private var managementActions: some View {
-        Button("Copy Diagnostics") { model.copyDiagnostics(for: session) }
-        Button("Delete Session…", role: .destructive) { isConfirmingDeletion = true }
+        Button("Copy Details") { model.copyDiagnostics(for: session) }
+        Button("Delete This Run…", role: .destructive) { isConfirmingDeletion = true }
             .disabled(session.installation != nil || session.state == .interrupted)
     }
 

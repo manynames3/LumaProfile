@@ -53,9 +53,9 @@ final class LumaProfileAppDelegate: NSObject, NSApplicationDelegate {
         if !model.hasFinishedInitialRecoveryAudit {
             let auditAlert = NSAlert()
             auditAlert.alertStyle = .warning
-            auditAlert.messageText = "Checking saved recovery state"
-            auditAlert.informativeText = "Quit is temporarily unavailable until LumaProfile checks saved sessions for an unfinished Restore Before. Try the check again, then quit when it completes."
-            auditAlert.addButton(withTitle: "Retry Recovery Check")
+            auditAlert.messageText = "Checking earlier runs"
+            auditAlert.informativeText = "Quit is temporarily unavailable until LumaProfile checks saved sessions for one that didn't finish going back to its old profile. Try the check again, then quit when it completes."
+            auditAlert.addButton(withTitle: "Check Again")
             auditAlert.addButton(withTitle: "Keep LumaProfile Open")
             if auditAlert.runModal() == .alertFirstButtonReturn {
                 Task { @MainActor in await model.load() }
@@ -66,8 +66,8 @@ final class LumaProfileAppDelegate: NSObject, NSApplicationDelegate {
         if model.requiresProtectedCleanupReview && !model.hasActiveOperation {
             let recoveryAlert = NSAlert()
             recoveryAlert.alertStyle = .critical
-            recoveryAlert.messageText = "Restore Before before quitting"
-            recoveryAlert.informativeText = "LumaProfile could not confirm the display's previous profile state. Quit was cancelled; open the affected session and choose Restore Before, then try again."
+            recoveryAlert.messageText = "Fix this screen's profile before quitting"
+            recoveryAlert.informativeText = "LumaProfile isn't sure which profile this screen is using. Quit was cancelled; open that run in History and press Go Back to Old Profile, then try again."
             recoveryAlert.addButton(withTitle: "Keep LumaProfile Open")
             recoveryAlert.runModal()
             return .terminateCancel
@@ -77,7 +77,7 @@ final class LumaProfileAppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = model.isRestoreRunning
-            ? "Finish restoring Before before quitting?"
+            ? "Finish going back to the old profile first?"
             : "Stop the active operation before quitting?"
         alert.informativeText = model.isRestoreRunning
             ? "LumaProfile is restoring the previous profile now. It must finish, or Quit will be cancelled so the display is not left in an uncertain state."
@@ -96,11 +96,11 @@ final class LumaProfileAppDelegate: NSObject, NSApplicationDelegate {
                 let failure = NSAlert()
                 failure.alertStyle = .critical
                 failure.messageText = model.requiresProtectedCleanupReview
-                    ? "Restore Before still needs review"
+                    ? "This screen's profile still needs fixing"
                     : "LumaProfile is still restoring the display"
                 failure.informativeText = model.requiresProtectedCleanupReview
-                    ? "Quit was cancelled because LumaProfile could not confirm the display's previous profile state. Open the affected session and choose Restore Before, then try again."
-                    : "Quit was cancelled because the calibration process did not stop cleanly. Wait for the session to finish cancelling, then try again."
+                    ? "Quit was cancelled because LumaProfile isn't sure which profile this screen is using. Open that run in History and press Go Back to Old Profile, then try again."
+                    : "Quit was cancelled because the calibration process did not stop cleanly. Wait for it to finish cancelling, then try again."
                 failure.runModal()
             }
             sender.reply(toApplicationShouldTerminate: stopped)

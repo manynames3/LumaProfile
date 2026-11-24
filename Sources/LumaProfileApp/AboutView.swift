@@ -47,9 +47,9 @@ struct AboutView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Local by default")
                         .font(.headline)
-                    Text("Display measurements, generated profiles, imported corrections, and session logs stay in your user account on this Mac. LumaProfile does not upload calibration data or require an account.")
+                    Text("Display measurements, generated profiles, imported corrections, and run logs stay in your user account on this Mac. LumaProfile does not upload calibration data or require an account.")
                     HStack {
-                        Button("Reveal Local Data") { Task { await model.revealLocalData() } }
+                        Button("Show My Data in Finder") { Task { await model.revealLocalData() } }
                         Button("Copy Support Diagnostics") { model.copyDiagnostics() }
                     }
                     Text("The copied summary omits raw measurements and replaces your home-folder path with ~. Review it before posting publicly.")

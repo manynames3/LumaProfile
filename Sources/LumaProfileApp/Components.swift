@@ -211,6 +211,7 @@ struct ProfileBeforeAfterView: View {
 
     @State private var isConfirmingActivation = false
     @State private var isConfirmingActivationOnly = false
+    @State private var isConfirmingRollback = false
 
     private var generatedProfile: SessionArtifact? {
         session.artifacts.last { artifact in
@@ -226,22 +227,22 @@ struct ProfileBeforeAfterView: View {
 
     private var afterStatus: (title: String, color: Color, symbol: String) {
         if generatedProfile == nil, session.installation == nil {
-            return ("No completed candidate", .secondary, "doc.badge.ellipsis")
+            return ("No new profile yet", .secondary, "doc.badge.ellipsis")
         }
         if let attempt = session.activationVerificationAttempt {
             switch attempt.status {
             case .failed:
                 if attempt.restoredBeforeProfile == true {
-                    return ("Activation/verification failed; Before restored", Luma.caution, "arrow.uturn.backward.circle.fill")
+                    return ("Couldn't switch to the new profile. Back on the old one.", Luma.caution, "arrow.uturn.backward.circle.fill")
                 }
-                return ("Activation/verification failed; final profile state needs review", Luma.critical, "exclamationmark.triangle.fill")
+                return ("Couldn't switch to the new profile. Check which profile is in use.", Luma.critical, "exclamationmark.triangle.fill")
             case .cancelled:
                 if attempt.restoredBeforeProfile == true {
-                    return ("Activation/verification cancelled; Before restored", Luma.caution, "arrow.uturn.backward.circle.fill")
+                    return ("Cancelled. Back on the old profile.", Luma.caution, "arrow.uturn.backward.circle.fill")
                 }
-                return ("Activation/verification cancelled; final profile state needs review", Luma.caution, "questionmark.circle.fill")
+                return ("Cancelled. Check which profile is in use.", Luma.caution, "questionmark.circle.fill")
             case .inProgress:
-                return ("Activation/verification in progress", Luma.caution, "clock.fill")
+                return ("Switching on and checking…", Luma.caution, "clock.fill")
             case .verified, .activated:
                 break
             }
@@ -251,9 +252,9 @@ struct ProfileBeforeAfterView: View {
         }
         switch installation.activationStatus {
         case .active:
-            return ("Activated by this session", Luma.positive, "checkmark.circle.fill")
+            return ("In use now", Luma.positive, "checkmark.circle.fill")
         case .activationPending:
-            return ("Activation attempted; final state unconfirmed", Luma.caution, "questionmark.circle.fill")
+            return ("Tried to switch on; not sure which profile is in use", Luma.caution, "questionmark.circle.fill")
         case .restorationRequired:
             return ("Restoration required; current state unconfirmed", Luma.caution, "exclamationmark.triangle.fill")
         @unknown default:
@@ -286,10 +287,10 @@ struct ProfileBeforeAfterView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
                     profileCard(
-                        title: "Before",
+                        title: "Old",
                         filename: beforeProfileName,
                         status: session.profileBaseline == nil
-                            ? "Before profile was not recorded"
+                            ? "The old profile was not recorded"
                             : "Active when calibration began",
                         symbol: "clock.arrow.circlepath",
                         color: .secondary
@@ -299,7 +300,7 @@ struct ProfileBeforeAfterView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxHeight: .infinity)
                     profileCard(
-                        title: "After",
+                        title: "New",
                         filename: generatedProfile?.url.lastPathComponent ?? "No completed ICC profile",
                         status: afterStatus.title,
                         symbol: afterStatus.symbol,
@@ -314,9 +315,9 @@ struct ProfileBeforeAfterView: View {
                 }
 
                 if session.installation == nil {
-                    Text("Your current profile stays active. After is applied only when you choose Activate.")
+                    Text("Your screen keeps its old profile until you press one of the Use buttons.")
                         .lumaNote()
-                        .help("Generation leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT while measuring; LumaProfile restores the active profile's calibration when generation ends.")
+                        .help("Calibrating doesn't change which profile your screen uses. That only happens when you press one of the Use buttons.")
                 }
 
                 if let attempt = session.activationVerificationAttempt,
@@ -333,52 +334,58 @@ struct ProfileBeforeAfterView: View {
 
                 HStack {
                     if canActivate {
-                        Button("Activate & Verify") { isConfirmingActivation = true }
+                        Button("Use & Check New Profile") { isConfirmingActivation = true }
                             .buttonStyle(.lumaPrimary)
                             .help("Switches to the new profile, then measures test colours to grade its accuracy. Needs the meter on the screen.")
-                        Button("Activate Only") { isConfirmingActivationOnly = true }
+                        Button("Use New Profile") { isConfirmingActivationOnly = true }
                             .help("Switches to the new profile and finishes. No measuring, no grade.")
                     }
                     if canRestore {
-                        Button("Restore Before", role: .destructive) {
-                            Task { await model.rollback(session) }
-                        }
+                        Button("Go Back to Old Profile", role: .destructive) { isConfirmingRollback = true }
                     }
                     if let generatedProfile {
-                        Button("Reveal After") {
+                        Button("Show Profile File") {
                             NSWorkspace.shared.activateFileViewerSelecting([generatedProfile.url])
                         }
                     }
                     if model.isActivationRunning {
                         ProgressView().controlSize(.small)
-                        Text("Activating and measuring…").font(.caption).foregroundStyle(.secondary)
+                        Text("Switching on and checking…").font(.caption).foregroundStyle(.secondary)
                         Button("Cancel", role: .cancel) {
                             Task { await model.cancelCalibration() }
                         }
                     } else if model.isRestoreRunning {
                         ProgressView().controlSize(.small)
-                        Text("Restoring Before…").font(.caption).foregroundStyle(.secondary)
+                        Text("Going back to the old profile…").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
         } label: {
-            Label("Profile Before / After", systemImage: "rectangle.split.2x1")
+            Label("Old and New Profile", systemImage: "rectangle.split.2x1")
         }
-        .alert("Activate and verify the After profile?", isPresented: $isConfirmingActivation) {
+        .alert("Switch to the new profile and check it?", isPresented: $isConfirmingActivation) {
             Button("Cancel", role: .cancel) {}
-            Button("Activate & Verify") {
+            Button("Use & Check New Profile") {
                 Task { await model.activateAndVerify(session) }
             }
         } message: {
             Text(activationConfirmationMessage)
         }
-        .alert("Activate the After profile without checking it?", isPresented: $isConfirmingActivationOnly) {
+        .alert("Go back to the old profile?", isPresented: $isConfirmingRollback) {
             Button("Cancel", role: .cancel) {}
-            Button("Activate Only") {
+            Button("Go Back", role: .destructive) {
+                Task { await model.rollback(session) }
+            }
+        } message: {
+            Text("\(session.display?.name ?? "This screen") switches back to the profile it used before. The new profile disappears from System Settings, but it stays saved in this run, and you can switch it on again from here.")
+        }
+        .alert("Switch to the new profile without checking it?", isPresented: $isConfirmingActivationOnly) {
+            Button("Cancel", role: .cancel) {}
+            Button("Use New Profile") {
                 Task { await model.activateAndVerify(session, verify: false) }
             }
         } message: {
-            Text("This switches \(session.display?.name ?? "the selected display") to the new profile and stops. Its accuracy is not measured, so no grade is shown. To check it later, choose Restore Before and then Activate & Verify.")
+            Text("This switches \(session.display?.name ?? "the selected display") to the new profile and stops. Its accuracy is not measured, so no grade is shown. To check it later, press Go Back to Old Profile, then Use & Check New Profile.")
         }
     }
 
@@ -397,8 +404,8 @@ struct ProfileBeforeAfterView: View {
                         Task { await model.setComparison(showBefore: side == .before, for: session) }
                     }
                 )) {
-                    Text("Before").tag(ProfileComparisonSide.before)
-                    Text("After").tag(ProfileComparisonSide.after)
+                    Text("Old").tag(ProfileComparisonSide.before)
+                    Text("New").tag(ProfileComparisonSide.after)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -407,8 +414,8 @@ struct ProfileBeforeAfterView: View {
             }
             ComparisonReferenceStrip()
             Text(showingBefore
-                ? "Showing Before temporarily. After is put back when you switch, start another operation, or quit."
-                : "Switch to Before to see the display as it was. This does not undo the activation.")
+                ? "Showing the old profile for now. The new one comes back when you switch, start something else, or quit."
+                : "Switch to Old to see how the screen looked before. This doesn't undo anything.")
                 .lumaNote()
         }
         .lumaTile(padding: 14)
@@ -417,7 +424,7 @@ struct ProfileBeforeAfterView: View {
     private var activationConfirmationMessage: String {
         let displayName = session.display?.name ?? "the selected display"
         let afterName = generatedProfile?.url.lastPathComponent ?? "the generated profile"
-        return "This will change \(displayName) from \(beforeProfileName) to \(afterName), then measure verification patches. If activation, verification, or cancellation fails, LumaProfile will attempt to restore Before."
+        return "This will change \(displayName) from \(beforeProfileName) to \(afterName), then measure test colours to grade it. If anything fails or you cancel, LumaProfile puts the old profile back."
     }
 
     private var measuredWhiteComparison: some View {
@@ -426,7 +433,7 @@ struct ProfileBeforeAfterView: View {
             HStack(spacing: 12) {
                 if let before = session.setupMeasurement {
                     whiteMeasurementCard(
-                        title: "Before setup reading",
+                        title: "Before calibration",
                         luminance: before.luminanceCDM2,
                         chromaticity: before.chromaticity,
                         temperature: before.correlatedColorTemperature,
@@ -434,13 +441,13 @@ struct ProfileBeforeAfterView: View {
                     )
                 } else {
                     unavailableMeasurementCard(
-                        title: "Before setup reading",
+                        title: "Before calibration",
                         detail: "Not captured before calibration"
                     )
                 }
                 if let report = session.verification {
                     whiteMeasurementCard(
-                        title: "After verification",
+                        title: "After calibration",
                         luminance: report.metrics.luminanceCDM2,
                         chromaticity: report.metrics.measuredWhite,
                         temperature: report.metrics.measuredCorrelatedColorTemperature,
@@ -448,12 +455,12 @@ struct ProfileBeforeAfterView: View {
                     )
                 } else {
                     unavailableMeasurementCard(
-                        title: "After verification",
-                        detail: "Available after Activate & Verify"
+                        title: "After calibration",
+                        detail: "Shown after Use & Check New Profile"
                     )
                 }
             }
-            Text("Before is a single setup white reading; After comes from the verification pass. This compares brightness and white point only, not full pre-calibration color accuracy.")
+            Text("Before is one white reading taken during setup. After comes from the accuracy check. This compares brightness and white point only.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

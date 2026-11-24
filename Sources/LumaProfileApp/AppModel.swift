@@ -430,7 +430,7 @@ final class AppModel: ObservableObject {
             ("Ambient lighting stable", stableLighting, "Avoid changing daylight or direct light on the panel."),
             ("Dynamic display features off", dynamicFeaturesDisabled, "Turn off HDR, Night Shift, True Tone, auto-brightness, and dynamic contrast."),
             ("Hardware controls ready", displayControlsReady, "Use the display's intended picture mode and reset unusual color controls."),
-            ("Previous profile state confirmed", !requiresProtectedCleanupReview, "Open the affected session and choose Restore Before before starting another calibration."),
+            ("Previous profile state confirmed", !requiresProtectedCleanupReview, "Open that run in History and press Go Back to Old Profile before starting another calibration."),
         ]
     }
 
@@ -878,8 +878,8 @@ final class AppModel: ObservableObject {
         }
         guard !requiresProtectedCleanupReview else {
             alert = AppAlert(
-                title: "Restore Before first",
-                message: "LumaProfile has not confirmed the previous profile state. Open the affected session and choose Restore Before before another activation."
+                title: "Fix the earlier run first",
+                message: "LumaProfile isn't sure which profile a screen is using. Open that run in History and press Go Back to Old Profile before switching on another profile."
             )
             return
         }
@@ -1017,7 +1017,7 @@ final class AppModel: ObservableObject {
     func handleSystemWillSleep() async {
         guard hasActiveOperation else { return }
         if isRestoreRunning {
-            statusMessage = "Mac sleep detected — Restore Before will resume when the Mac wakes."
+            statusMessage = "Mac sleep detected — going back to the old profile will resume when the Mac wakes."
             return
         }
         statusMessage = "Mac sleep detected — cancellation requested; recovery will continue after wake."
@@ -1031,7 +1031,7 @@ final class AppModel: ObservableObject {
     func handleSystemDidWake() async {
         guard hasActiveOperation else { return }
         if isRestoreRunning {
-            statusMessage = "Mac woke — finishing Restore Before…"
+            statusMessage = "Mac woke — finishing going back to the old profile…"
             return
         }
         statusMessage = "Mac woke — finishing safe cancellation…"
@@ -1110,7 +1110,7 @@ final class AppModel: ObservableObject {
         do {
             try await switcher.showComparison(.after, record: context.record, for: context.display)
         } catch {
-            present(error, title: "After profile not restored after comparison")
+            present(error, title: "New profile not restored after comparison")
         }
         comparisonBeforeSessionID = nil
         comparisonContext = nil
@@ -1121,14 +1121,14 @@ final class AppModel: ObservableObject {
         guard !hasActiveOperation, !isRefreshing, !isRefreshingInstruments else {
             alert = AppAlert(
                 title: "Another operation is active",
-                message: "Wait for the current measurement, calibration, activation, or Restore Before operation to finish."
+                message: "Wait for the current measurement, calibration, activation, or profile change to finish."
             )
             return
         }
         // Restoration is not considered safe until the workflow confirms it.
         protectedCleanupSessionIDs.insert(session.id)
         isRestoreRunning = true
-        statusMessage = "Restoring the Before profile…"
+        statusMessage = "Going back to the old profile…"
         beginWorkflowActivity(reason: "Restoring the previous display profile")
         let workflow = self.workflow
         let task = Task { try await workflow.restoreBefore(session: session) }
@@ -1141,7 +1141,7 @@ final class AppModel: ObservableObject {
         do {
             workflowSession = try await task.value
             protectedCleanupSessionIDs.remove(session.id)
-            statusMessage = "Before profile restored"
+            statusMessage = "Back on the old profile"
             do {
                 try await reloadSessions()
             } catch {
@@ -1150,14 +1150,14 @@ final class AppModel: ObservableObject {
         } catch is CancellationError {
             protectedCleanupSessionIDs.insert(session.id)
             alert = AppAlert(
-                title: "Restore Before still needs review",
-                message: "The restoration task was interrupted. Reopen the session and confirm the active profile before continuing."
+                title: "This screen's profile still needs fixing",
+                message: "The restoration task was interrupted. Open the run again and confirm the active profile before continuing."
             )
             try? await reloadSessions()
         } catch {
             protectedCleanupSessionIDs.insert(session.id)
-            statusMessage = "Restore Before failed: \(error.localizedDescription)"
-            present(error, title: "Restore Before failed")
+            statusMessage = "Couldn't go back to the old profile: \(error.localizedDescription)"
+            present(error, title: "Couldn't go back to the old profile")
             try? await reloadSessions()
         }
     }
@@ -1211,8 +1211,8 @@ final class AppModel: ObservableObject {
               session.activationVerificationAttempt?.status != .inProgress,
               session.installation == nil else {
             alert = AppAlert(
-                title: "Session retained for safety",
-                message: "This session may still be needed to identify or restore a display profile. Restore Before, or finish the active operation, before deleting its record."
+                title: "This run can't be deleted yet",
+                message: "This run may still be needed to put a screen's profile back. Go back to the old profile, or finish what's running, before deleting its record."
             )
             return
         }
@@ -1221,7 +1221,7 @@ final class AppModel: ObservableObject {
             if workflowSession?.id == session.id { beginAnotherCalibration() }
             try await reloadSessions()
         } catch {
-            present(error, title: "Session not deleted")
+            present(error, title: "Run not deleted")
         }
     }
 
@@ -1311,13 +1311,13 @@ final class AppModel: ObservableObject {
         ]
 
         if let generatedAt = session.profileGenerationCompletedAt {
-            lines.append("Generated candidate: Complete — \(reportDate(generatedAt))")
+            lines.append("New profile: Complete — \(reportDate(generatedAt))")
         } else if session.artifacts.contains(where: {
             $0.isComplete && ["icc", "icm"].contains($0.url.pathExtension.lowercased())
         }) {
-            lines.append("Generated candidate: Complete — completion time was not recorded by this historical session")
+            lines.append("New profile: Complete — completion time was not recorded by this historical session")
         } else {
-            lines.append("Generated candidate: Not completed")
+            lines.append("New profile: Not completed")
         }
         if let failure = session.failureMessage, !failure.isEmpty {
             lines.append("Session note: \(reportValue(failure))")
@@ -1372,7 +1372,7 @@ final class AppModel: ObservableObject {
             if session.verification != nil {
                 let activeState = session.installation == nil
                     ? "Current profile state was not recorded in the newer outcome format."
-                    : "A generated candidate is recorded as installed."
+                    : "A new profile is recorded as installed."
                 return [
                     "Activation: Completed by a historical LumaProfile version",
                     "Outcome: Verification data is available. \(activeState)",
@@ -1381,19 +1381,19 @@ final class AppModel: ObservableObject {
             if let installation = session.installation {
                 return [
                     "Activation: Recorded by a historical LumaProfile version",
-                    "Currently installed candidate: \(profileFilename(installation.installedProfileURL))",
+                    "Currently installed new profile: \(profileFilename(installation.installedProfileURL))",
                     "Outcome: Detailed verification and restoration status was not recorded.",
                 ]
             }
             return [
                 "Activation: Not attempted",
-                "Outcome: The generated candidate remained inactive; the Before profile was left in use.",
+                "Outcome: The new profile remained inactive; the old profile was left in use.",
             ]
         }
 
         var lines = ["Attempt started: \(reportDate(attempt.startedAt))"]
         if let activatedAt = attempt.profileActivatedAt {
-            lines.append("After profile activated: \(reportDate(activatedAt))")
+            lines.append("New profile activated: \(reportDate(activatedAt))")
         }
         if let verificationStartedAt = attempt.verificationStartedAt {
             lines.append("Verification started: \(reportDate(verificationStartedAt))")
@@ -1408,17 +1408,17 @@ final class AppModel: ObservableObject {
             outcome = "Incomplete — no durable terminal activation result was recorded."
         case .activated:
             outcome = attempt.restoredBeforeProfile == true
-                ? "Activated without verification; the Before profile was later restored."
-                : "Activated without verification; the generated After profile remains active."
+                ? "Activated without verification; the old profile was later restored."
+                : "Activated without verification; the new profile remains active."
         case .verified:
             if attempt.restoredBeforeProfile == true {
-                outcome = "Verified successfully; the Before profile was later restored."
+                outcome = "Verified successfully; the old profile was later restored."
             } else {
-                outcome = "Verified successfully; the generated After profile remains active."
+                outcome = "Verified successfully; the new profile remains active."
             }
         case .failed:
             if attempt.restoredBeforeProfile == true {
-                outcome = "Failed; the Before profile was restored and the generated candidate remains inactive."
+                outcome = "Failed; the old profile was restored and the new profile remains inactive."
             } else if attempt.restoredBeforeProfile == false {
                 outcome = "Failed; restoration was not confirmed. Recovery may still be required."
             } else {
@@ -1426,7 +1426,7 @@ final class AppModel: ObservableObject {
             }
         case .cancelled:
             if attempt.restoredBeforeProfile == true {
-                outcome = "Cancelled; the Before profile was restored and the generated candidate remains inactive."
+                outcome = "Cancelled; the old profile was restored and the new profile remains inactive."
             } else if attempt.restoredBeforeProfile == false {
                 outcome = "Cancelled; restoration was not confirmed. Recovery may still be required."
             } else {
@@ -1435,14 +1435,14 @@ final class AppModel: ObservableObject {
         }
         lines.append("Outcome: \(outcome)")
         if let restoredAt = attempt.restoredBeforeProfileAt {
-            lines.append("Before profile restored: Yes — \(reportDate(restoredAt))")
+            lines.append("Old profile restored: Yes — \(reportDate(restoredAt))")
         } else if let restored = attempt.restoredBeforeProfile {
-            lines.append("Before profile restored: \(restored ? "Yes" : "No")")
+            lines.append("Old profile restored: \(restored ? "Yes" : "No")")
         } else {
-            lines.append("Before profile restored: Unconfirmed")
+            lines.append("Old profile restored: Unconfirmed")
         }
         if let installation = session.installation {
-            lines.append("Currently installed candidate: \(profileFilename(installation.installedProfileURL))")
+            lines.append("Currently installed new profile: \(profileFilename(installation.installedProfileURL))")
         }
         if let error = attempt.errorMessage, !error.isEmpty {
             lines.append("Attempt note: \(reportValue(error))")
@@ -1623,7 +1623,7 @@ final class AppModel: ObservableObject {
             case .artifactCreated(let artifact):
                 logs.append(LogRecord(level: "Artifact", message: artifact.kind))
             case .verificationCompleted(let report):
-                logs.append(LogRecord(level: "Verification", message: String(format: "Average ΔE00 %.2f", report.metrics.averageDeltaE2000)))
+                logs.append(LogRecord(level: "Accuracy Check", message: String(format: "Average ΔE00 %.2f", report.metrics.averageDeltaE2000)))
             case .warning(let warning):
                 logs.append(LogRecord(level: "Warning", message: warning))
             case .technicalLog(let record):
@@ -1865,7 +1865,7 @@ private extension WorkflowStage {
         case .characterizing: "Measuring display color"
         case .buildingProfile: "Building ICC profile"
         case .installingProfile: "Installing and activating profile"
-        case .verifying: "Verifying result"
+        case .verifying: "Checking accuracy"
         case .completed: "Calibration complete"
         case .cancelling: "Cancelling safely"
         case .cancelled: "Calibration cancelled"

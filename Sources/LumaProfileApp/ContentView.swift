@@ -27,7 +27,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 VStack(alignment: .leading, spacing: 8) {
                     StatusPill(
-                        title: model.engineProbe.isAvailable ? "Engine ready" : "Engine unavailable",
+                        title: model.engineProbe.isAvailable ? "Ready" : "Not ready",
                         isReady: model.engineProbe.isAvailable
                     )
                     Text(model.engineStatusSummary)
