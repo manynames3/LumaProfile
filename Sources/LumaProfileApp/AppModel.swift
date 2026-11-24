@@ -758,8 +758,6 @@ final class AppModel: ObservableObject {
         defer {
             measurementTask = nil
             whiteMeasurementSurface.dismiss()
-            // Put back the calibration of the profile macOS has associated.
-            CGDisplayRestoreColorSyncSettings()
             isMeasuring = false
             isLiveAdjusting = false
             endWorkflowActivity()
@@ -778,13 +776,9 @@ final class AppModel: ObservableObject {
                     await self?.cancelMeasurement()
                 }
             }
-            // Read the panel's own output. With a calibrated profile active, its
-            // calibration curve already pulls white to target, so the gauge
-            // would say "On target" while the monitor itself is still too
-            // bright. Calibration starts from this same uncorrected state.
-            // The identity table is temporary and affects only this display.
-            CGSetDisplayTransferByFormula(display.cgDisplayID, 0, 1, 1, 0, 1, 1, 0, 1, 1)
-            // Let the white surface and the identity curve settle first.
+            // Adjust Live only reads. It must never change a display's colour
+            // curve or ask macOS to reload one: a failed restore blanks screens.
+            // Let the white surface settle first.
             try await Task.sleep(for: .milliseconds(300))
             guard !liveStopRequested else { return }
             // One persistent meter session; readings arrive back to back.

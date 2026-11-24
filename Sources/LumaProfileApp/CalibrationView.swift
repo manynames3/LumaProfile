@@ -457,7 +457,7 @@ struct CalibrationView: View {
                     }
                     .buttonStyle(.lumaPrimary)
                     .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments || model.confirmedDisplay == nil || model.selectedInstrument == nil)
-                    .help("Keeps reading while you turn the monitor's own brightness and white-point controls toward the target.")
+                    .help("Keeps reading while you turn the monitor's own brightness and white-point controls toward the target. It only reads; it never changes the display's colour settings.")
                     Button("Measure Once") {
                         Task { await model.captureQuickMeasurement(forAdjustment: true) }
                     }
