@@ -85,16 +85,6 @@ struct HistoryView: View {
         }
     }
 
-    private func plainStatus(_ status: ActivationVerificationAttemptStatus) -> String {
-        switch status {
-        case .inProgress: "Switching on…"
-        case .verified: "Switched on and checked"
-        case .activated: "Switched on, not checked"
-        case .failed: "Couldn't be switched on"
-        case .cancelled: "Cancelled"
-        }
-    }
-
     private func statusTitle(for session: CalibrationSession) -> String {
         if let attempt = session.activationVerificationAttempt {
             switch attempt.status {
@@ -237,5 +227,15 @@ private struct SessionDetailView: View {
             Text(label).foregroundStyle(.secondary).frame(width: 90, alignment: .leading)
             Text(value).textSelection(.enabled)
         }
+    }
+}
+
+private func plainStatus(_ status: ActivationVerificationAttemptStatus) -> String {
+    switch status {
+    case .inProgress: "Switching on…"
+    case .verified: "Switched on and checked"
+    case .activated: "Switched on, not checked"
+    case .failed: "Couldn't be switched on"
+    case .cancelled: "Cancelled"
     }
 }
