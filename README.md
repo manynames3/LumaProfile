@@ -5,7 +5,7 @@
 **Make your Mac screen show true colors.**<br>
 Plug in a color meter. Click through 4 steps. Get a checked color profile.
 
-**[⬇ Download for Mac (0.1.2 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.2/LumaProfile-0.1.2-arm64.dmg)**<br>
+**[⬇ Download for Mac (0.1.3 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.3/LumaProfile-0.1.3-arm64.dmg)**<br>
 <sub>Apple Silicon · macOS 15+ · not notarized, so macOS asks you to approve it once</sub>
 
 <img src="docs/images/hardware.jpg" alt="LumaProfile calibrating a Dell monitor with an i1 Display Pro meter" width="720">
@@ -59,7 +59,7 @@ You need:
 - An Apple Silicon Mac on macOS 15 or newer
 - An X-Rite i1Display Pro or Plus meter (USB)
 
-1. [Download the DMG](https://github.com/manynames3/LumaProfile/releases/download/v0.1.2/LumaProfile-0.1.2-arm64.dmg) ([all releases](https://github.com/manynames3/LumaProfile/releases)).
+1. [Download the DMG](https://github.com/manynames3/LumaProfile/releases/download/v0.1.3/LumaProfile-0.1.3-arm64.dmg) ([all releases](https://github.com/manynames3/LumaProfile/releases)).
 2. Open it. Drag LumaProfile to Applications.
 3. Right-click the app and choose **Open** the first time.
 

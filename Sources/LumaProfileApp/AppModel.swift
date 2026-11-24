@@ -194,7 +194,9 @@ final class AppModel: ObservableObject {
     @Published var progressCompleted = 0
     @Published var progressTotal: Int?
     @Published var statusMessage = "Ready"
-    @Published var requiredAction: UserActionRequest?
+    @Published var requiredAction: UserActionRequest? {
+        didSet { updateRequiredActionPanel() }
+    }
     @Published var logs: [LogRecord] = []
 
     @Published var measurementMode: MeasurementMode {
@@ -225,6 +227,7 @@ final class AppModel: ObservableObject {
     private let defaults: UserDefaults
     private let displayIdentifier = DisplayIdentificationPresenter()
     private let whiteMeasurementSurface = WhiteMeasurementSurfacePresenter()
+    private let requiredActionPanel = RequiredActionPanelPresenter()
     private var measurementTask: Task<LumaCore.Measurement, Error>?
     private var restoreTask: Task<CalibrationSession, Error>?
     private var workflowActivity: NSObjectProtocol?
@@ -910,6 +913,21 @@ final class AppModel: ObservableObject {
             present(error, title: "Profile activation stopped")
             try? await reloadSessions()
         }
+    }
+
+    /// Mirrors the in-window prompt in a floating panel so it stays reachable
+    /// when the patch window covers LumaProfile.
+    private func updateRequiredActionPanel() {
+        guard let action = requiredAction else {
+            requiredActionPanel.dismiss()
+            return
+        }
+        requiredActionPanel.show(
+            message: action.message,
+            display: confirmedDisplay,
+            onContinue: { [weak self] in Task { await self?.continueRequiredAction() } },
+            onCancel: { [weak self] in Task { await self?.cancelCalibration() } }
+        )
     }
 
     func continueRequiredAction() async {

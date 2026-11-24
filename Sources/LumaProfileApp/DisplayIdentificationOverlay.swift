@@ -338,3 +338,97 @@ private struct LuminanceTrack: View {
         .accessibilityValue(value.map { String(format: "%.0f of %.0f candelas per square metre", $0, target) } ?? "No reading yet")
     }
 }
+
+/// Floats the "your action is required" prompt above ArgyllCMS's patch window.
+/// On a small or single screen that window can cover LumaProfile entirely, and
+/// a run that is waiting for Continue then looks like one that is working.
+@MainActor
+final class RequiredActionPanelPresenter {
+    private var panel: NSPanel?
+
+    func show(
+        message: String,
+        display: PhysicalDisplay?,
+        onContinue: @escaping @MainActor () -> Void,
+        onCancel: @escaping @MainActor () -> Void
+    ) {
+        dismiss()
+        let screen = NSScreen.screens.first(where: { screen in
+            let value = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+            return value?.uint32Value == display?.cgDisplayID
+        }) ?? NSScreen.main
+        guard let screen else { return }
+
+        let visible = screen.visibleFrame
+        let width = min(560, visible.width - 32)
+        let host = NSHostingView(
+            rootView: RequiredActionPanelView(message: message, onContinue: onContinue, onCancel: onCancel)
+                .frame(width: width)
+        )
+        host.appearance = NSAppearance(named: .darkAqua)
+        let size = host.fittingSize
+        // Bottom centre: clear of the meter, which hangs at the patch centre.
+        let frame = NSRect(
+            x: visible.midX - size.width / 2,
+            y: visible.minY + 20,
+            width: size.width,
+            height: size.height
+        )
+        let panel = NSPanel(
+            contentRect: frame,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        // ArgyllCMS raises its patch window very high; this small prompt has to
+        // sit above it. It leaves the rest of the screen, and alerts, visible.
+        panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.contentView = host
+        panel.setFrame(frame, display: true)
+        panel.orderFrontRegardless()
+        self.panel = panel
+    }
+
+    func dismiss() {
+        panel?.orderOut(nil)
+        panel?.close()
+        panel = nil
+    }
+}
+
+private struct RequiredActionPanelView: View {
+    var message: String
+    var onContinue: @MainActor () -> Void
+    var onCancel: @MainActor () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "hand.raised.fill")
+                .font(.title2)
+                .foregroundStyle(Luma.caution)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Waiting for you").font(.headline)
+                Text(message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            VStack(spacing: 6) {
+                Button("Continue") { onContinue() }
+                    .buttonStyle(.lumaPrimary)
+                Button("Cancel") { onCancel() }
+                    .buttonStyle(.lumaSecondary)
+            }
+        }
+        .padding(16)
+        .background(Luma.surface, in: RoundedRectangle(cornerRadius: Luma.cardRadius))
+        .overlay(RoundedRectangle(cornerRadius: Luma.cardRadius).stroke(Luma.caution.opacity(0.6), lineWidth: 1))
+        .preferredColorScheme(.dark)
+    }
+}
