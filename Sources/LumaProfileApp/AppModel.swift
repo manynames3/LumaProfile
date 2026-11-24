@@ -793,11 +793,21 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// True when this is the meter-placement prompt and the meter took a
+    /// setup reading on this display within the last ten minutes.
+    private func meterWasJustOnScreen(for action: UserActionRequest) -> Bool {
+        guard action.id == ArgyllPromptIdentifier.instrumentPlacement.rawValue,
+              let reading = preCalibrationMeasurement else { return false }
+        return Date().timeIntervalSince(reading.capturedAt) < 600
+    }
+
     /// Returns whether the live session should take another reading.
     private func recordLiveReading(_ measurement: LumaCore.Measurement) -> Bool {
         guard !liveStopRequested else { return false }
         preCalibrationMeasurement = measurement
         liveAdjustment.record(measurement)
+        // Brightness has held on target: finish without a click.
+        if liveAdjustment.shouldAutoFinish { return false }
         // Bounded so an unattended session cannot hold the meter forever.
         return liveAdjustment.readingCount < 1_200
     }
@@ -1604,13 +1614,16 @@ final class AppModel: ObservableObject {
                 progressCompleted = completed
                 progressTotal = total
             case .userActionRequired(let action):
-                if action.id == confirmedPlacementActionID, !isActivationRunning {
-                    // Same run, same prompt, meter still in place: answer it.
+                if !isActivationRunning, action.id == confirmedPlacementActionID || meterWasJustOnScreen(for: action) {
+                    // The meter is demonstrably in place (confirmed earlier in
+                    // this run, or it took a setup reading minutes ago), so
+                    // answer the placement prompt and keep going.
                     statusMessage = "Continuing…"
-                    logs.append(LogRecord(level: "Info", message: "Meter placement was already confirmed for this run; continuing."))
+                    logs.append(LogRecord(level: "Info", message: "The meter is already on the screen; continuing without asking."))
                     Task { [weak self] in
                         do {
                             try await self?.workflow.acknowledgeUserAction(id: action.id)
+                            self?.confirmedPlacementActionID = action.id
                         } catch {
                             self?.requiredAction = action
                             self?.statusMessage = "Waiting for your confirmation…"

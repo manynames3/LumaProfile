@@ -601,6 +601,13 @@ private struct WorkflowView: View {
                 if model.isWorkflowRunning {
                     LumaCard {
                         VStack(alignment: .leading, spacing: 14) {
+                            if let headline = stageHeadline {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(headline.step).lumaEyebrow()
+                                    Text(headline.title).font(Luma.title)
+                                    Text(headline.detail).lumaNote()
+                                }
+                            }
                             if let total = model.progressTotal, total > 0 {
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                                     Text("\(model.progressCompleted)").font(Luma.heroNumeral)
@@ -752,6 +759,36 @@ private struct WorkflowView: View {
         }
     }
 
+    /// Says in plain words which part of the run is happening and that it
+    /// continues without the user.
+    private var stageHeadline: (step: String, title: String, detail: String)? {
+        let handsOff = model.requiredAction == nil
+            ? "Nothing to do. This keeps going until your profile is ready."
+            : "Waiting for you. Press Continue above."
+        if model.isActivationRunning {
+            switch session.state {
+            case .installingProfile:
+                return ("Step 1 of 2", "Switching your screen to the new profile", handsOff)
+            case .verifying, .awaitingMeterPlacement:
+                return ("Step 2 of 2", "Measuring test colours to grade the new profile", handsOff)
+            default:
+                return nil
+            }
+        }
+        switch session.state {
+        case .preflighting, .awaitingMeterPlacement, .adjustingDisplay:
+            return ("Getting ready", "Checking the screen and the meter", handsOff)
+        case .calibrating:
+            return ("Step 1 of 3", "Tuning brightness, white point and tone", "Several short rounds of readings, so the counter restarts between rounds. " + handsOff)
+        case .generatingPatchSet, .characterizing:
+            return ("Step 2 of 3", "Measuring how the screen shows each colour", handsOff)
+        case .buildingProfile:
+            return ("Step 3 of 3", "Building your colour profile file", "This takes a few seconds. " + handsOff)
+        default:
+            return nil
+        }
+    }
+
     private func stageNode(_ stage: WorkflowStage) -> some View {
         let currentIndex = stages.firstIndex(of: session.state) ?? -1
         let index = stages.firstIndex(of: stage) ?? 0
@@ -766,10 +803,10 @@ private struct WorkflowView: View {
 
     private func shortName(_ stage: WorkflowStage) -> String {
         switch stage {
-        case .calibrating: "Calibrate"
-        case .characterizing: "Measure"
-        case .buildingProfile: "Build"
-        case .installingProfile: "Install"
+        case .calibrating: "1. Tune"
+        case .characterizing: "2. Measure"
+        case .buildingProfile: "3. Build"
+        case .installingProfile: "Switch on"
         case .verifying: "Check"
         case .completed: "Done"
         default: stage.rawValue
@@ -779,9 +816,9 @@ private struct WorkflowView: View {
     private var progressUnit: String {
         switch session.state {
         case .generatingPatchSet, .awaitingMeterPlacement, .characterizing:
-            "characterization patches"
+            "colours measured"
         default:
-            "readings"
+            "readings this round"
         }
     }
 }
