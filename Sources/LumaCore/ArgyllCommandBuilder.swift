@@ -109,7 +109,12 @@ public enum ArgyllCommandBuilder {
             mode: request.mode,
             geometry: request.patchGeometry
         )
-        arguments += ["-k", try absoluteFilePath(request.calibrationURL, expectedExtension: "cal")]
+        // `-K` applies the calibration to the patch values. `-k` would load it
+        // into the display's VideoLUT, and on a Mac with two displays
+        // ArgyllCMS 3.5.0 then zeroes the main display's curve (a black
+        // screen) while measuring the other one. Never let ArgyllCMS write a
+        // VideoLUT here.
+        arguments += ["-K", try absoluteFilePath(request.calibrationURL, expectedExtension: "cal")]
         arguments.append(try basePath(inputOutputBaseURL, removingExtension: "ti1"))
         return ArgyllInvocation(
             tool: .dispread,

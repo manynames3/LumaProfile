@@ -909,6 +909,35 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private var blackScreenWatchdog: Task<Void, Never>?
+
+    /// While LumaProfile is open, watches for a display whose colour curve has
+    /// been zeroed (a black screen) and resets it. A display must read black
+    /// on two checks in a row, so a brief fade by another app is ignored.
+    func startBlackScreenWatchdog() {
+        guard blackScreenWatchdog == nil else { return }
+        blackScreenWatchdog = Task { [weak self] in
+            var seenLastTime = Set<UInt32>()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                let black = Set(DisplayCurveGuard.blackDisplays())
+                let persistent = black.intersection(seenLastTime)
+                seenLastTime = black
+                guard !persistent.isEmpty else { continue }
+                let repaired = DisplayCurveGuard.repairBlackDisplays()
+                seenLastTime = []
+                guard !repaired.isEmpty else { continue }
+                self?.reportBlackScreenRepair(count: repaired.count)
+            }
+        }
+    }
+
+    private func reportBlackScreenRepair(count: Int) {
+        let message = "LumaProfile found \(count == 1 ? "a display" : "\(count) displays") with a blacked-out colour curve and reset the colour profile so the screen is usable. Check the profile in System Settings → Displays."
+        logs.append(LogRecord(level: "Warning", message: message))
+        alert = AppAlert(title: "A black screen was repaired", message: message)
+    }
+
     /// Mirrors the in-window prompt in a floating panel so it stays reachable
     /// when the patch window covers LumaProfile.
     private func updateRequiredActionPanel() {

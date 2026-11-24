@@ -64,7 +64,10 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task { await model.load() }
+        .task {
+            model.startBlackScreenWatchdog()
+            await model.load()
+        }
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
         }

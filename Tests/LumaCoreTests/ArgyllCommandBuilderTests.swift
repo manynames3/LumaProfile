@@ -347,8 +347,10 @@ struct ArgyllCommandBuilderTests {
 
         #expect(invocation.tool == .dispread)
         #expect(invocation.arguments.containsOrderedSubsequence([
-            "-d", "1", "-c", "4", "-X", correction.path, "-y", "r", "-k", calibration.path,
+            "-d", "1", "-c", "4", "-X", correction.path, "-y", "r", "-K", calibration.path,
         ]))
+        // Loading a calibration into the VideoLUT blanked the other display.
+        #expect(!invocation.arguments.contains("-k"))
         #expect(invocation.arguments.containsOrderedSubsequence(["-P", "0.5,0.5,2.5,2.5"]))
         #expect(!invocation.arguments.contains("-Yp"))
         #expect(!invocation.arguments.containsOrderedSubsequence(["-Y", "p"]))
