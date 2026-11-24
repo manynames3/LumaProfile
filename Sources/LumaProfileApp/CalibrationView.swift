@@ -645,7 +645,9 @@ private struct WorkflowView: View {
     }
 
     private var workflowTitle: String {
-        if model.isActivationRunning { return "Activating After profile" }
+        if model.isActivationRunning {
+            return model.isActivationVerifying ? "Checking the new profile's accuracy" : "Switching to the new profile"
+        }
         return switch session.state {
         case .completed: "Profile complete"
         case .failed: "Calibration failed"

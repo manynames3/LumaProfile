@@ -146,8 +146,10 @@ public actor CalibrationWorkflow {
     /// Activates a generated candidate only after a separate, explicit UI action,
     /// then measures an independent verification set. Normal calibration runs do
     /// not call this operation.
+    /// `verify: false` activates the profile and stops, with no measuring pass.
     public func activateAndVerify(
-        session: CalibrationSession
+        session: CalibrationSession,
+        verify: Bool = true
     ) -> AsyncThrowingStream<CalibrationWorkflowUpdate, Error> {
         guard runningTask == nil else {
             return AsyncThrowingStream { continuation in
@@ -157,7 +159,7 @@ public actor CalibrationWorkflow {
 
         let stream = AsyncThrowingStream<CalibrationWorkflowUpdate, Error> { continuation in
             runningTask = Task {
-                await executeActivationAndVerification(session, continuation: continuation)
+                await executeActivationAndVerification(session, verify: verify, continuation: continuation)
             }
             continuation.onTermination = { @Sendable [weak self] termination in
                 guard case .cancelled = termination else { return }
@@ -608,6 +610,7 @@ public actor CalibrationWorkflow {
 
     private func executeActivationAndVerification(
         _ original: CalibrationSession,
+        verify: Bool,
         continuation: AsyncThrowingStream<CalibrationWorkflowUpdate, Error>.Continuation
     ) async {
         var session = original
@@ -625,11 +628,12 @@ public actor CalibrationWorkflow {
             continuation.finish(throwing: CalibrationWorkflowError.missingDisplay)
             return
         }
-        guard let instrument = original.instrument else {
+        // Activation alone measures nothing, so it needs no meter or target.
+        if verify, original.instrument == nil {
             continuation.finish(throwing: CalibrationWorkflowError.missingInstrument)
             return
         }
-        guard let target = original.target else {
+        if verify, original.target == nil {
             continuation.finish(throwing: CalibrationWorkflowError.missingTarget)
             return
         }
@@ -686,11 +690,15 @@ public actor CalibrationWorkflow {
             guard probe.isAvailable else {
                 throw CalibrationWorkflowError.engineUnavailable(probe.diagnostic)
             }
-            try await requireConnectedHardware(
-                display: display,
-                instrument: instrument,
-                unavailableMessage: "Reconnect the i1Display used for this session before activating and verifying the generated profile."
-            )
+            if verify, let instrument = original.instrument {
+                try await requireConnectedHardware(
+                    display: display,
+                    instrument: instrument,
+                    unavailableMessage: "Reconnect the i1Display used for this session before activating and verifying the generated profile."
+                )
+            } else {
+                try await engine.validateDisplayMapping(for: display)
+            }
 
             try await emit(.stageChanged(.installingProfile), session: &session, continuation: continuation)
             try await activate(
@@ -701,6 +709,21 @@ public actor CalibrationWorkflow {
             )
 
             try Task.checkCancellation()
+            guard verify, let instrument = original.instrument, let target = original.target else {
+                session.activationVerificationAttempt?.status = .activated
+                session.activationVerificationAttempt?.finishedAt = persistenceTimestamp()
+                session.activationVerificationAttempt?.errorMessage = nil
+                session.activationVerificationAttempt?.restoredBeforeProfile = false
+                session.activationVerificationAttempt?.restoredBeforeProfileAt = nil
+                try await emit(
+                    .message("The After profile was activated without a verification pass."),
+                    session: &session,
+                    continuation: continuation
+                )
+                try await emit(.stageChanged(.completed), session: &session, continuation: continuation)
+                continuation.finish()
+                return
+            }
             try await requireConnectedHardware(
                 display: display,
                 instrument: instrument,

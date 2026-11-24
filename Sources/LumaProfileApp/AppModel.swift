@@ -834,6 +834,7 @@ final class AppModel: ObservableObject {
         workflowSession = nil
         workflowDirectory = nil
         logs = []
+        confirmedPlacementActionID = nil
         requiredAction = nil
         progressCompleted = 0
         progressTotal = nil
@@ -860,7 +861,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func activateAndVerify(_ session: CalibrationSession) async {
+    /// True while an activation run includes the measuring check.
+    @Published private(set) var isActivationVerifying = false
+    /// The meter-placement prompt already confirmed in the current calibration
+    /// run. The next tool in the same run asks again; the meter has not moved.
+    private var confirmedPlacementActionID: String?
+
+    func activateAndVerify(_ session: CalibrationSession, verify: Bool = true) async {
         await restoreAfterIfComparing()
         guard hasFinishedInitialRecoveryAudit else {
             alert = AppAlert(
@@ -883,22 +890,27 @@ final class AppModel: ObservableObject {
         progressTotal = nil
         requiredAction = nil
         statusMessage = "Preparing profile activation…"
+        confirmedPlacementActionID = nil
         isWorkflowRunning = true
         isActivationRunning = true
+        isActivationVerifying = verify
         beginWorkflowActivity(reason: "Activating and verifying a display profile")
         defer {
             isActivationRunning = false
+            isActivationVerifying = false
             isWorkflowRunning = false
             endWorkflowActivity()
         }
 
         do {
-            guard let instrument = session.instrument else {
-                throw CalibrationWorkflowError.missingInstrument
+            if verify {
+                guard let instrument = session.instrument else {
+                    throw CalibrationWorkflowError.missingInstrument
+                }
+                statusMessage = "Rechecking the meter connection…"
+                try await requireSelectedInstrumentConnection(instrument)
             }
-            statusMessage = "Rechecking the meter connection…"
-            try await requireSelectedInstrumentConnection(instrument)
-            let stream = await workflow.activateAndVerify(session: session)
+            let stream = await workflow.activateAndVerify(session: session, verify: verify)
             for try await update in stream {
                 apply(update)
             }
@@ -957,6 +969,7 @@ final class AppModel: ObservableObject {
         guard let action = requiredAction else { return }
         do {
             try await workflow.acknowledgeUserAction(id: action.id)
+            if !isActivationRunning { confirmedPlacementActionID = action.id }
             requiredAction = nil
             statusMessage = "Continuing…"
         } catch {
@@ -1393,6 +1406,10 @@ final class AppModel: ObservableObject {
         switch attempt.status {
         case .inProgress:
             outcome = "Incomplete — no durable terminal activation result was recorded."
+        case .activated:
+            outcome = attempt.restoredBeforeProfile == true
+                ? "Activated without verification; the Before profile was later restored."
+                : "Activated without verification; the generated After profile remains active."
         case .verified:
             if attempt.restoredBeforeProfile == true {
                 outcome = "Verified successfully; the Before profile was later restored."
@@ -1587,8 +1604,22 @@ final class AppModel: ObservableObject {
                 progressCompleted = completed
                 progressTotal = total
             case .userActionRequired(let action):
-                requiredAction = action
-                statusMessage = "Waiting for your confirmation…"
+                if action.id == confirmedPlacementActionID, !isActivationRunning {
+                    // Same run, same prompt, meter still in place: answer it.
+                    statusMessage = "Continuing…"
+                    logs.append(LogRecord(level: "Info", message: "Meter placement was already confirmed for this run; continuing."))
+                    Task { [weak self] in
+                        do {
+                            try await self?.workflow.acknowledgeUserAction(id: action.id)
+                        } catch {
+                            self?.requiredAction = action
+                            self?.statusMessage = "Waiting for your confirmation…"
+                        }
+                    }
+                } else {
+                    requiredAction = action
+                    statusMessage = "Waiting for your confirmation…"
+                }
             case .artifactCreated(let artifact):
                 logs.append(LogRecord(level: "Artifact", message: artifact.kind))
             case .verificationCompleted(let report):

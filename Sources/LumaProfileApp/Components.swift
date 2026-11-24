@@ -210,6 +210,7 @@ struct ProfileBeforeAfterView: View {
     var session: CalibrationSession
 
     @State private var isConfirmingActivation = false
+    @State private var isConfirmingActivationOnly = false
 
     private var generatedProfile: SessionArtifact? {
         session.artifacts.last { artifact in
@@ -241,7 +242,7 @@ struct ProfileBeforeAfterView: View {
                 return ("Activation/verification cancelled; final profile state needs review", Luma.caution, "questionmark.circle.fill")
             case .inProgress:
                 return ("Activation/verification in progress", Luma.caution, "clock.fill")
-            case .verified:
+            case .verified, .activated:
                 break
             }
         }
@@ -313,7 +314,7 @@ struct ProfileBeforeAfterView: View {
                 }
 
                 if session.installation == nil {
-                    Text("Your current profile stays active. After is applied only when you confirm Activate & Verify After.")
+                    Text("Your current profile stays active. After is applied only when you choose Activate.")
                         .lumaNote()
                         .help("Generation leaves the ColorSync profile association unchanged. Argyll temporarily adjusts the display VideoLUT while measuring; LumaProfile restores the active profile's calibration when generation ends.")
                 }
@@ -332,8 +333,11 @@ struct ProfileBeforeAfterView: View {
 
                 HStack {
                     if canActivate {
-                        Button("Activate & Verify After") { isConfirmingActivation = true }
+                        Button("Activate & Verify") { isConfirmingActivation = true }
                             .buttonStyle(.lumaPrimary)
+                            .help("Switches to the new profile, then measures test colours to grade its accuracy. Needs the meter on the screen.")
+                        Button("Activate Only") { isConfirmingActivationOnly = true }
+                            .help("Switches to the new profile and finishes. No measuring, no grade.")
                     }
                     if canRestore {
                         Button("Restore Before", role: .destructive) {
@@ -367,6 +371,14 @@ struct ProfileBeforeAfterView: View {
             }
         } message: {
             Text(activationConfirmationMessage)
+        }
+        .alert("Activate the After profile without checking it?", isPresented: $isConfirmingActivationOnly) {
+            Button("Cancel", role: .cancel) {}
+            Button("Activate Only") {
+                Task { await model.activateAndVerify(session, verify: false) }
+            }
+        } message: {
+            Text("This switches \(session.display?.name ?? "the selected display") to the new profile and stops. Its accuracy is not measured, so no grade is shown. To check it later, choose Restore Before and then Activate & Verify.")
         }
     }
 

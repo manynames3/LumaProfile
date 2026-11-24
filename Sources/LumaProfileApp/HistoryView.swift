@@ -91,7 +91,7 @@ struct HistoryView: View {
             case .failed: return attempt.restoredBeforeProfile == true ? "Attempt failed · restored" : "Attempt failed"
             case .cancelled: return attempt.restoredBeforeProfile == true ? "Cancelled · restored" : "Cancelled attempt"
             case .inProgress: return "Activation in progress"
-            case .verified: break
+            case .verified, .activated: break
             }
         }
         if let rating = session.verificationAssessment?.rating { return rating.rawValue }
@@ -110,7 +110,7 @@ struct HistoryView: View {
             case .failed: return "exclamationmark.triangle.fill"
             case .cancelled: return "arrow.uturn.backward.circle.fill"
             case .inProgress: return "clock.fill"
-            case .verified: break
+            case .verified, .activated: break
             }
         }
         if session.verificationAssessment?.rating == .needsAttention {
