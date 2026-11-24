@@ -5,7 +5,7 @@
 **Make your Mac screen show true colors.**<br>
 Plug in a color meter. Click through 4 steps. Get a checked color profile.
 
-> **Using 0.1.2 or 0.1.3? Update.** In those versions, pressing Done in Adjust Live could leave screens black on a two-display Mac. If that happens, pick a different colour profile for each display in System Settings → Displays. 0.1.4 removes the cause.
+> **Known problem in every version so far (0.1.2 to 0.1.4): a screen can go black on a Mac with two displays.** It has happened after Adjust Live and in the middle of a calibration, on a display that was using a LumaProfile-made profile. The cause is not found yet. To recover, pick a different colour profile for the black display in System Settings → Displays. Until this is fixed, use LumaProfile only if you are comfortable doing that without seeing the affected screen.
 
 **[⬇ Download for Mac (0.1.4 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.4/LumaProfile-0.1.4-arm64.dmg)**<br>
 <sub>Apple Silicon · macOS 15+ · not notarized, so macOS asks you to approve it once</sub>
