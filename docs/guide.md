@@ -92,6 +92,10 @@ Only one application can usually own a meter at a time. Quit vendor calibration 
 
 Once a session has activated its After profile, the result card offers a **Before | After** switch with a neutral reference strip. Choosing **Before** temporarily points the same display back at the profile that was active when the run began so you can judge the change by eye; choosing **After** returns it. This is a viewing aid, not a rollback: the session stays recorded as activated, no file is removed, and LumaProfile puts After back before another profile-changing operation and before quitting. It refuses to switch if the display is on any profile other than those two. If the app is force-quit while Before is showing, the display stays on Before until you activate again or pick the profile in System Settings.
 
+## Two-display safety
+
+On a Mac with two displays, ArgyllCMS 3.5.0 zeroes the main display's colour curve (a black screen) when it loads a calibration into the VideoLUT of the other display. This was reproduced with `dispwin -d2 calibration.cal` on macOS 27.2.1; the zeroed curve survives the tool exiting and a ColorSync reload, and clears when the display's profile is re-associated. LumaProfile therefore characterizes with `dispread -K` (calibration applied to patch values) instead of `-k` (calibration loaded into the VideoLUT), and never asks ArgyllCMS to write a VideoLUT. While the app is open it also checks every display's curve every two seconds; a display that reads black twice in a row is reset to its default profile, and its previous profile is put back only if it then loads cleanly.
+
 ## Local data, privacy, and reports
 
 Measurements, generated profiles, imported correction copies, session JSON, event logs, and raw Argyll diagnostics remain in the current user's local account. Sessions and corrections are stored under `~/Library/Application Support/LumaProfile`; a candidate explicitly activated by the operator is copied under `~/Library/ColorSync/Profiles/LumaProfile`. LumaProfile does not require an account or upload calibration data. **Settings → Reveal Local Data** opens the app-managed data folder.
