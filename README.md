@@ -5,6 +5,8 @@
 **Make your Mac screen show true colors.**<br>
 Plug in a color meter. Click through 4 steps. Get a checked color profile.
 
+> **Warning for 0.1.2 and 0.1.3: do not use Adjust Live.** On a two-display Mac, pressing Done left both screens black until each display's colour profile was changed in System Settings → Displays. Use **Measure Once** instead. A fixed version is coming.
+
 **[⬇ Download for Mac (0.1.3 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.3/LumaProfile-0.1.3-arm64.dmg)**<br>
 <sub>Apple Silicon · macOS 15+ · not notarized, so macOS asks you to approve it once</sub>
 
