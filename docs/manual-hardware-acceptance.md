@@ -56,7 +56,7 @@ Do not paste personal home-directory paths or unrelated USB serial numbers into 
 - [ ] Completing profile generation does not install or activate the candidate, and the selected display's ColorSync profile association is unchanged from the evidence header.
 - [ ] The result screen shows **Before** as the profile captured at the start and **After** as the generated candidate, with the latter clearly labeled **Generated; not currently activated by this session**.
 - [ ] The same Before/After identities remain attached to the session after relaunch; neither label claims measured improvement before verification.
-- [ ] Before explicit activation, **Before setup reading** shows only the optional single white reading (or clearly says it was not captured), while **After verification** says it is available only after **Activate & Verify**.
+- [ ] Before explicit activation, **Before setup reading** shows only the optional single white reading (or clearly says it was not captured), while **After verification** says it is available only after **Use & Check New Profile**.
 - [ ] After verification, the measured comparison shows luminance, xy, and estimated CCT and explicitly says it compares brightness/white point only—not equivalent full pre/post patch sets or full pre-calibration color accuracy.
 - [ ] Generation-only completion reloads the previously active profile's calibration into the selected display VideoLUT and does not modify another display.
 - [ ] No installation or verification begins until the operator uses the explicit activation action and confirms the selected display, current profile, and generated candidate.
@@ -70,7 +70,7 @@ Do not paste personal home-directory paths or unrelated USB serial numbers into 
 ## Before / After comparison
 
 - [ ] After a verified activation, the **Before | After** switch changes only the selected display between the two recorded profiles, ColorSync readback matches each choice, and the reference strip visibly changes.
-- [ ] While Before is showing, starting another calibration, activation, Restore Before, or Quit first returns the display to After.
+- [ ] While Before is showing, starting another calibration, activation, Go Back to Old Profile, or Quit first returns the display to After.
 - [ ] The switch is unavailable for sessions that are not currently recorded as activated, and it refuses to act when the display is on a third profile.
 
 ## Rollback fault injection
@@ -78,18 +78,18 @@ Do not paste personal home-directory paths or unrelated USB serial numbers into 
 Perform these checks with a deliberately disposable test profile, never the only known-good profile.
 
 - [ ] Cancelling or forcing a failure before explicit activation leaves the ColorSync association unchanged and restores the selected display's previous calibration.
-- [ ] Force-quitting during generation produces an **Interrupted** session on relaunch; after the same display mapping is available, **Restore Before** reloads calibration without installing or activating the candidate.
+- [ ] Force-quitting during generation produces an **Interrupted** session on relaunch; after the same display mapping is available, **Go Back to Old Profile** reloads calibration without installing or activating the candidate.
 - [ ] Cancelling after installation reactivates the recorded previous profile for the same display.
 - [ ] A forced verification failure after installation triggers the same rollback.
 - [ ] A failed or cancelled activation attempt persists its finish time, error, and whether Before restoration was confirmed; an unconfirmed rollback is displayed as recovery still required rather than success.
-- [ ] Repeating rollback is harmless, and a later successful **Restore Before** updates the durable record with confirmed restoration and its time.
+- [ ] Repeating rollback is harmless, and a later successful **Go Back to Old Profile** updates the durable record with confirmed restoration and its time.
 - [ ] Relaunch reconstructs recovery-required state from interrupted sessions. If two sessions require recovery, successfully restoring one does not unlock calibration, activation, or Quit until the other session is also restored.
 - [ ] A deliberately unreadable saved session and a failed initial recovery audit both keep calibration and activation unavailable; repairing/removing the unreadable test record and rerunning the audit clears only that fail-closed condition.
-- [ ] Force-quit after **Restore Before** begins but before it completes; relaunch still reports restoration required because the recovery marker was saved before ColorSync or VideoLUT changed.
+- [ ] Force-quit after **Go Back to Old Profile** begins but before it completes; relaunch still reports restoration required because the recovery marker was saved before ColorSync or VideoLUT changed.
 - [ ] Generation-only restoration and post-activation rollback cannot apply a previous profile or calibration to a different display fingerprint after disconnecting or reordering displays.
 - [ ] After terminating the app during post-install verification, the session supports manual recovery and clearly names the previous profile.
-- [ ] Engine override, measurement-mode save, and correction removal controls are unavailable during measurement, calibration, activation, or Restore Before; they cannot replace the engine that owns an active child process.
-- [ ] Quit or closing the only window during measurement/calibration requests safe cancellation. During Restore Before it waits for completion; if restoration fails or does not finish within the bounded wait, Quit is cancelled, new calibration/activation remains blocked, and only a later successful Restore Before clears the recovery warning.
+- [ ] Engine override, measurement-mode save, and correction removal controls are unavailable during measurement, calibration, activation, or Go Back to Old Profile; they cannot replace the engine that owns an active child process.
+- [ ] Quit or closing the only window during measurement/calibration requests safe cancellation. During Go Back to Old Profile it waits for completion; if restoration fails or does not finish within the bounded wait, Quit is cancelled, new calibration/activation remains blocked, and only a later successful Go Back to Old Profile clears the recovery warning.
 - [ ] Idle sleep is suppressed during active work. Forced lid/user sleep is tested separately: after wake, cancellation/restoration resumes, and any session whose restoration was not confirmed remains **Interrupted** with explicit recovery rather than being reported as safe.
 - [ ] Manual restoration in ColorSync Utility succeeds.
 

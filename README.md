@@ -5,9 +5,9 @@
 **Make your Mac screen show true colors.**<br>
 Plug in a color meter. Click through 4 steps. Get a checked color profile.
 
-> **Known problem in every version so far (0.1.2 to 0.1.4): a screen can go black on a Mac with two displays.** It has happened after Adjust Live and in the middle of a calibration, on a display that was using a LumaProfile-made profile. The cause is not found yet. To recover, pick a different colour profile for the black display in System Settings → Displays. Until this is fixed, use LumaProfile only if you are comfortable doing that without seeing the affected screen.
+> **Two-display Macs: update to 0.1.5.** Versions 0.1.2 to 0.1.4 could turn one screen black while calibrating the other. The cause was found and is fixed in 0.1.5, which also repairs a blacked-out screen by itself while the app is open. The fix has not yet been confirmed by a full calibration on real hardware. If a screen does go black, pick a different colour profile for it in System Settings → Displays.
 
-**[⬇ Download for Mac (0.1.4 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.4/LumaProfile-0.1.4-arm64.dmg)**<br>
+**[⬇ Download for Mac (0.1.5 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.5/LumaProfile-0.1.5-arm64.dmg)**<br>
 <sub>Apple Silicon · macOS 15+ · not notarized, so macOS asks you to approve it once</sub>
 
 <img src="docs/images/hardware.jpg" alt="LumaProfile calibrating a Dell monitor with an i1 Display Pro meter" width="720">
@@ -61,7 +61,7 @@ You need:
 - An Apple Silicon Mac on macOS 15 or newer
 - An X-Rite i1Display Pro or Plus meter (USB)
 
-1. [Download the DMG](https://github.com/manynames3/LumaProfile/releases/download/v0.1.4/LumaProfile-0.1.4-arm64.dmg) ([all releases](https://github.com/manynames3/LumaProfile/releases)).
+1. [Download the DMG](https://github.com/manynames3/LumaProfile/releases/download/v0.1.5/LumaProfile-0.1.5-arm64.dmg) ([all releases](https://github.com/manynames3/LumaProfile/releases)).
 2. Open it. Drag LumaProfile to Applications.
 3. Right-click the app and choose **Open** the first time.
 

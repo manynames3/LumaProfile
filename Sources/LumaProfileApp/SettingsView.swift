@@ -47,7 +47,7 @@ struct SettingsView: View {
                     ForEach(MeasurementMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments)
-                Label("Calibration leaves the ColorSync association unchanged. Argyll temporarily adjusts the display VideoLUT during measurement, and LumaProfile restores the active profile's calibration afterward. The generated ICC profile is activated only after you explicitly confirm Activate & Verify.", systemImage: "hand.raised.circle")
+                Label("Calibrating doesn't change which profile your screen uses. That only happens when you press one of the Use buttons.", systemImage: "hand.raised.circle")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Save Preferences") { Task { await model.saveSettingsAndReloadEngine() } }
                     .disabled(model.hasActiveOperation || model.isRefreshing || model.isRefreshingInstruments)
@@ -76,10 +76,10 @@ struct SettingsView: View {
             }
 
             Section("Privacy & Support") {
-                Label("Measurements, profiles, and session logs stay on this Mac. LumaProfile does not upload calibration data.", systemImage: "lock.shield")
+                Label("Measurements, profiles, and run logs stay on this Mac. LumaProfile does not upload calibration data.", systemImage: "lock.shield")
                 HStack {
-                    Button("Reveal Local Data") { Task { await model.revealLocalData() } }
-                    Button("Copy Diagnostics") { model.copyDiagnostics() }
+                    Button("Show My Data in Finder") { Task { await model.revealLocalData() } }
+                    Button("Copy Details") { model.copyDiagnostics() }
                 }
                 Text("Copied diagnostics omit raw measurements and shorten your home-folder path. Review anything you paste into a public issue.")
                     .font(.caption)
@@ -108,7 +108,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) { correctionToRemove = nil }
         } message: {
-            Text("The app-managed CCSS or CCMX copy will be deleted. Past session records keep their provenance, but future runs cannot use it unless you import it again.")
+            Text("The app-managed CCSS or CCMX copy will be deleted. Past runs keep their provenance, but future runs cannot use it unless you import it again.")
         }
     }
 }

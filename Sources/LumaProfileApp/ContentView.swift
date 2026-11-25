@@ -27,7 +27,7 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 VStack(alignment: .leading, spacing: 8) {
                     StatusPill(
-                        title: model.engineProbe.isAvailable ? "Engine ready" : "Engine unavailable",
+                        title: model.engineProbe.isAvailable ? "Ready" : "Not ready",
                         isReady: model.engineProbe.isAvailable
                     )
                     Text(model.engineStatusSummary)
@@ -64,7 +64,10 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task { await model.load() }
+        .task {
+            model.startBlackScreenWatchdog()
+            await model.load()
+        }
         .alert(item: $model.alert) { alert in
             Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
         }

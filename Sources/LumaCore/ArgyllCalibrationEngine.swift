@@ -1042,6 +1042,9 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
         if profileClass != "mntr" {
             messages.append("Profile class is '\(profileClass)' rather than the expected display class 'mntr'.")
         }
+        if let data = try? Data(contentsOf: url), data.range(of: Data("vcgt".utf8)) == nil {
+            messages.append("Warning: the profile has no calibration curve (vcgt tag), so activating it will not apply the calibration.")
+        }
         return messages
     }
 

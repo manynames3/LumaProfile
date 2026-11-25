@@ -197,19 +197,32 @@ final class LiveAdjustmentState: ObservableObject {
     @Published private(set) var targetLuminance: Double?
     @Published private(set) var targetTemperature: Double?
 
+    /// On-target readings in a row. The gauge closes itself after
+    /// `readingsToAutoFinish`, so no Done click is needed.
+    @Published private(set) var onTargetStreak = 0
+
     static let luminanceTolerance = 5.0
     static let temperatureTolerance = 250.0
+    static let readingsToAutoFinish = 5
+
+    var shouldAutoFinish: Bool { onTargetStreak >= Self.readingsToAutoFinish }
 
     func begin(measurement: LumaCore.Measurement?, targetLuminance: Double?, targetTemperature: Double?) {
         self.measurement = measurement
         self.targetLuminance = targetLuminance
         self.targetTemperature = targetTemperature
         readingCount = 0
+        onTargetStreak = 0
     }
 
     func record(_ measurement: LumaCore.Measurement) {
         self.measurement = measurement
         readingCount += 1
+        if let targetLuminance, abs(measurement.luminanceCDM2 - targetLuminance) <= Self.luminanceTolerance {
+            onTargetStreak += 1
+        } else {
+            onTargetStreak = 0
+        }
     }
 }
 
@@ -251,11 +264,11 @@ private struct LiveAdjustmentGauge: View {
                     .foregroundStyle(whitePointColor)
                 Spacer()
                 ProgressView().controlSize(.small)
-                Text(state.readingCount == 0 ? "Taking the first reading…" : "Reading \(state.readingCount + 1)…")
+                Text(progressText)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                Button("Done", action: done)
-                    .buttonStyle(.lumaPrimary)
+                Button("Close", action: done)
+                    .buttonStyle(.lumaSecondary)
                     .keyboardShortcut(.cancelAction)
                     .accessibilityHint("Stops live readings and keeps the last one.")
             }
@@ -264,6 +277,15 @@ private struct LiveAdjustmentGauge: View {
         .frame(width: 640)
         .background(Luma.canvas, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .animation(.easeOut(duration: 0.25), value: state.readingCount)
+    }
+
+    private var progressText: String {
+        if state.readingCount == 0 { return "Taking the first reading…" }
+        if state.onTargetStreak > 0 {
+            let left = max(LiveAdjustmentState.readingsToAutoFinish - state.onTargetStreak, 0)
+            return left == 0 ? "Done" : "On target. Closing in \(left)…"
+        }
+        return "Reading \(state.readingCount + 1)…"
     }
 
     private var luminanceAdvice: (text: String, color: Color) {

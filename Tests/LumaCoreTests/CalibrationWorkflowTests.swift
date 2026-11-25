@@ -203,6 +203,30 @@ struct CalibrationWorkflowTests {
     }
 
     @Test
+    func activationOnlyLeavesTheProfileActiveWithoutMeasuring() async throws {
+        let root = try TestSupport.makeTemporaryDirectory()
+        defer { TestSupport.removeTemporaryDirectory(root) }
+        let store = FileSessionStore(rootDirectory: root)
+        // The meter is gone before verification; activation alone must not need it.
+        let engine = WorkflowFakeEngine(scenario: .instrumentDisconnectsBeforeVerification)
+        let installer = WorkflowFakeInstaller()
+        let workflow = CalibrationWorkflow(engine: engine, installer: installer, store: store)
+        let generated = try #require((await observe(await workflow.run(request()))).lastSession)
+
+        let activation = await observe(await workflow.activateAndVerify(session: generated, verify: false))
+
+        #expect(!activation.hadError)
+        let final = try #require(activation.lastSession)
+        #expect(final.state == .completed)
+        #expect(final.installation?.activationStatus == .active)
+        #expect(final.activationVerificationAttempt?.status == .activated)
+        #expect(final.activationVerificationAttempt?.restoredBeforeProfile == false)
+        #expect(final.verification == nil)
+        #expect((await engine.snapshot()).verificationCount == 0)
+        #expect((await installer.snapshot()).rollbackCount == 0)
+    }
+
+    @Test
     func explicitActivationAndVerificationRunsOnlyAfterGenerationCompletes() async throws {
         let root = try TestSupport.makeTemporaryDirectory()
         defer { TestSupport.removeTemporaryDirectory(root) }

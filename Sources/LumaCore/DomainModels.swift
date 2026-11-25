@@ -763,6 +763,8 @@ public struct EnvironmentSnapshot: Codable, Hashable, Sendable {
 public enum ActivationVerificationAttemptStatus: String, Codable, CaseIterable, Hashable, Sendable {
     case inProgress
     case verified
+    /// The profile was activated and left active without a verification pass.
+    case activated
     case failed
     case cancelled
 }
