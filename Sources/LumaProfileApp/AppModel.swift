@@ -188,14 +188,16 @@ final class AppModel: ObservableObject {
 
     @Published var workflowSession: CalibrationSession?
     @Published var workflowDirectory: URL?
-    @Published var isWorkflowRunning = false
+    @Published var isWorkflowRunning = false {
+        didSet { updateRunStatusPanel() }
+    }
     @Published var isActivationRunning = false
     @Published var isRestoreRunning = false
     @Published var progressCompleted = 0
     @Published var progressTotal: Int?
     @Published var statusMessage = "Ready"
     @Published var requiredAction: UserActionRequest? {
-        didSet { updateRequiredActionPanel() }
+        didSet { updateRunStatusPanel() }
     }
     @Published var logs: [LogRecord] = []
 
@@ -227,7 +229,7 @@ final class AppModel: ObservableObject {
     private let defaults: UserDefaults
     private let displayIdentifier = DisplayIdentificationPresenter()
     private let whiteMeasurementSurface = WhiteMeasurementSurfacePresenter()
-    private let requiredActionPanel = RequiredActionPanelPresenter()
+    private let runStatusPanel = RunStatusPanelPresenter()
     private var measurementTask: Task<LumaCore.Measurement, Error>?
     private var restoreTask: Task<CalibrationSession, Error>?
     private var workflowActivity: NSObjectProtocol?
@@ -960,19 +962,45 @@ final class AppModel: ObservableObject {
         alert = AppAlert(title: "A black screen was repaired", message: message)
     }
 
-    /// Mirrors the in-window prompt in a floating panel so it stays reachable
-    /// when the patch window covers LumaProfile.
-    private func updateRequiredActionPanel() {
-        guard let action = requiredAction else {
-            requiredActionPanel.dismiss()
+    /// Keeps the status strip on the measured display for the whole run, so
+    /// progress and any Continue prompt stay visible behind the patch window.
+    private func updateRunStatusPanel() {
+        guard isWorkflowRunning || requiredAction != nil else {
+            runStatusPanel.dismiss()
             return
         }
-        requiredActionPanel.show(
-            message: action.message,
-            display: confirmedDisplay,
-            onContinue: { [weak self] in Task { await self?.continueRequiredAction() } },
-            onCancel: { [weak self] in Task { await self?.cancelCalibration() } }
-        )
+        runStatusPanel.show(model: self, display: workflowSession?.display ?? confirmedDisplay)
+    }
+
+    /// What the run is doing, in plain words, for the progress card and the
+    /// status strip on the measured display.
+    var runHeadline: (step: String, title: String, detail: String) {
+        let handsOff = requiredAction == nil
+            ? "Nothing to do. This keeps going until your profile is ready."
+            : "Waiting for you."
+        let state = workflowSession?.state ?? .preflighting
+        if isActivationRunning {
+            switch state {
+            case .installingProfile:
+                return ("Step 1 of 2", "Switching your screen to the new profile", handsOff)
+            case .verifying, .awaitingMeterPlacement:
+                return ("Step 2 of 2", "Measuring test colours to grade the new profile", "Leave the meter where it is. " + handsOff)
+            default:
+                return ("Finishing", "Wrapping up", handsOff)
+            }
+        }
+        switch state {
+        case .calibrating:
+            return ("Step 1 of 3", "Tuning brightness, white point and tone", "Several short rounds; the counter restarts each round. Leave the meter where it is. " + handsOff)
+        case .generatingPatchSet, .characterizing:
+            return ("Step 2 of 3", "Measuring how the screen shows each colour", "Leave the meter where it is. " + handsOff)
+        case .buildingProfile:
+            return ("Step 3 of 3", "Building your colour profile file", "The meter can come off now. This takes a few seconds.")
+        case .cancelling:
+            return ("Stopping", "Cancelling safely", "Putting your screen back the way it was.")
+        default:
+            return ("Getting ready", "Checking the screen and the meter", handsOff)
+        }
     }
 
     func continueRequiredAction() async {

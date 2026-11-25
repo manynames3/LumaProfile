@@ -361,96 +361,137 @@ private struct LuminanceTrack: View {
     }
 }
 
-/// Floats the "your action is required" prompt above ArgyllCMS's patch window.
-/// On a small or single screen that window can cover LumaProfile entirely, and
-/// a run that is waiting for Continue then looks like one that is working.
+/// A status strip pinned to the bottom of the display being measured, above
+/// ArgyllCMS's patch window. During a run that window covers the screen, and on
+/// a Mac with one display LumaProfile itself is hidden, so this strip is the
+/// only place the user can see what is happening, how far along it is, and
+/// press Continue when the run needs them.
 @MainActor
-final class RequiredActionPanelPresenter {
+final class RunStatusPanelPresenter {
     private var panel: NSPanel?
+    private var displayID: CGDirectDisplayID?
 
-    func show(
-        message: String,
-        display: PhysicalDisplay?,
-        onContinue: @escaping @MainActor () -> Void,
-        onCancel: @escaping @MainActor () -> Void
-    ) {
-        dismiss()
+    static let panelHeight: CGFloat = 168
+
+    func show(model: AppModel, display: PhysicalDisplay?) {
         let screen = NSScreen.screens.first(where: { screen in
             let value = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
             return value?.uint32Value == display?.cgDisplayID
         }) ?? NSScreen.main
         guard let screen else { return }
+        let screenID = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        if panel != nil, screenID == displayID { return }
+        dismiss()
 
         let visible = screen.visibleFrame
-        let width = min(560, visible.width - 32)
-        let host = NSHostingView(
-            rootView: RequiredActionPanelView(message: message, onContinue: onContinue, onCancel: onCancel)
-                .frame(width: width)
-        )
-        host.appearance = NSAppearance(named: .darkAqua)
-        let size = host.fittingSize
-        // Bottom centre: clear of the meter, which hangs at the patch centre.
+        let width = min(640, visible.width - 32)
+        // Bottom centre: well clear of the meter, which hangs at the patch centre.
         let frame = NSRect(
-            x: visible.midX - size.width / 2,
-            y: visible.minY + 20,
-            width: size.width,
-            height: size.height
+            x: visible.midX - width / 2,
+            y: visible.minY + 16,
+            width: width,
+            height: Self.panelHeight
         )
+        let host = NSHostingView(rootView: RunStatusPanelView(model: model))
+        host.appearance = NSAppearance(named: .darkAqua)
         let panel = NSPanel(
             contentRect: frame,
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        // ArgyllCMS raises its patch window very high; this small prompt has to
-        // sit above it. It leaves the rest of the screen, and alerts, visible.
+        // ArgyllCMS raises its patch window very high; the strip has to sit above it.
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.hidesOnDeactivate = false
+        panel.ignoresMouseEvents = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = host
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
         self.panel = panel
+        self.displayID = screenID
     }
 
     func dismiss() {
         panel?.orderOut(nil)
         panel?.close()
         panel = nil
+        displayID = nil
     }
 }
 
-private struct RequiredActionPanelView: View {
-    var message: String
-    var onContinue: @MainActor () -> Void
-    var onCancel: @MainActor () -> Void
+private struct RunStatusPanelView: View {
+    @ObservedObject var model: AppModel
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            Image(systemName: "hand.raised.fill")
-                .font(.title2)
-                .foregroundStyle(Luma.caution)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Waiting for you").font(.headline)
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack {
+            Spacer(minLength: 0)
+            content
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Luma.surface, in: RoundedRectangle(cornerRadius: Luma.cardRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Luma.cardRadius)
+                        .stroke(model.requiredAction == nil ? Luma.hairline : Luma.caution.opacity(0.7), lineWidth: 1)
+                )
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let action = model.requiredAction {
+            HStack(alignment: .center, spacing: 14) {
+                Image(systemName: "hand.raised.fill")
+                    .font(.title2)
+                    .foregroundStyle(Luma.caution)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Waiting for you").font(.headline)
+                    Text(action.message)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                VStack(spacing: 6) {
+                    Button("Continue") { Task { await model.continueRequiredAction() } }
+                        .buttonStyle(.lumaPrimary)
+                    Button("Cancel") { Task { await model.cancelCalibration() } }
+                        .buttonStyle(.lumaSecondary)
+                }
             }
-            Spacer(minLength: 8)
-            VStack(spacing: 6) {
-                Button("Continue") { onContinue() }
-                    .buttonStyle(.lumaPrimary)
-                Button("Cancel") { onCancel() }
-                    .buttonStyle(.lumaSecondary)
+        } else {
+            let headline = model.runHeadline
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(headline.step).lumaEyebrow()
+                    Spacer()
+                    if let total = model.progressTotal, total > 0 {
+                        Text("\(model.progressCompleted) of \(total)")
+                            .font(.system(size: 13).monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(headline.title).font(Luma.title)
+                if let total = model.progressTotal, total > 0 {
+                    LumaProgressBar(fraction: Double(model.progressCompleted) / Double(total))
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+                HStack(alignment: .firstTextBaseline) {
+                    Text(headline.detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button("Cancel") { Task { await model.cancelCalibration() } }
+                        .buttonStyle(.lumaSecondary)
+                        .help("Stops the run. Your screen keeps the profile it had before.")
+                }
             }
         }
-        .padding(16)
-        .background(Luma.surface, in: RoundedRectangle(cornerRadius: Luma.cardRadius))
-        .overlay(RoundedRectangle(cornerRadius: Luma.cardRadius).stroke(Luma.caution.opacity(0.6), lineWidth: 1))
-        .preferredColorScheme(.dark)
     }
 }
