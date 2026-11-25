@@ -601,12 +601,11 @@ private struct WorkflowView: View {
                 if model.isWorkflowRunning {
                     LumaCard {
                         VStack(alignment: .leading, spacing: 14) {
-                            if let headline = stageHeadline {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(headline.step).lumaEyebrow()
-                                    Text(headline.title).font(Luma.title)
-                                    Text(headline.detail).lumaNote()
-                                }
+                            let headline = model.runHeadline
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(headline.step).lumaEyebrow()
+                                Text(headline.title).font(Luma.title)
+                                Text(headline.detail).lumaNote()
                             }
                             if let total = model.progressTotal, total > 0 {
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -756,36 +755,6 @@ private struct WorkflowView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    /// Says in plain words which part of the run is happening and that it
-    /// continues without the user.
-    private var stageHeadline: (step: String, title: String, detail: String)? {
-        let handsOff = model.requiredAction == nil
-            ? "Nothing to do. This keeps going until your profile is ready."
-            : "Waiting for you. Press Continue above."
-        if model.isActivationRunning {
-            switch session.state {
-            case .installingProfile:
-                return ("Step 1 of 2", "Switching your screen to the new profile", handsOff)
-            case .verifying, .awaitingMeterPlacement:
-                return ("Step 2 of 2", "Measuring test colours to grade the new profile", handsOff)
-            default:
-                return nil
-            }
-        }
-        switch session.state {
-        case .preflighting, .awaitingMeterPlacement, .adjustingDisplay:
-            return ("Getting ready", "Checking the screen and the meter", handsOff)
-        case .calibrating:
-            return ("Step 1 of 3", "Tuning brightness, white point and tone", "Several short rounds of readings, so the counter restarts between rounds. " + handsOff)
-        case .generatingPatchSet, .characterizing:
-            return ("Step 2 of 3", "Measuring how the screen shows each colour", handsOff)
-        case .buildingProfile:
-            return ("Step 3 of 3", "Building your colour profile file", "This takes a few seconds. " + handsOff)
-        default:
-            return nil
         }
     }
 
