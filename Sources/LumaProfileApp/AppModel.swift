@@ -938,7 +938,32 @@ final class AppModel: ObservableObject {
     /// While LumaProfile is open, watches for a display whose colour curve has
     /// been zeroed (a black screen) and resets it. A display must read black
     /// on two checks in a row, so a brief fade by another app is ignored.
+    /// The background guard keeps working when LumaProfile is closed and
+    /// after the Mac wakes. On by default; Settings can turn it off.
+    @Published var isBackgroundGuardOn = UserDefaults.standard.object(forKey: "backgroundDisplayGuard") as? Bool ?? true
+    @Published var backgroundGuardProblem: String?
+
+    func applyBackgroundGuardSetting() {
+        UserDefaults.standard.set(isBackgroundGuardOn, forKey: "backgroundDisplayGuard")
+        if isBackgroundGuardOn {
+            do {
+                try DisplayGuardAgent.install()
+                backgroundGuardProblem = nil
+            } catch {
+                backgroundGuardProblem = "The background guard could not be started: \(error.localizedDescription)"
+            }
+        } else {
+            DisplayGuardAgent.uninstall()
+            backgroundGuardProblem = nil
+        }
+    }
+
     func startBlackScreenWatchdog() {
+        applyBackgroundGuardSetting()
+        let leftovers = DisplayCurveGuard.restoreArgyllLeftovers()
+        if !leftovers.isEmpty {
+            logs.append(LogRecord(level: "Warning", message: "Restored \(leftovers.count) display profile(s) that ArgyllCMS had left swapped."))
+        }
         guard blackScreenWatchdog == nil else { return }
         blackScreenWatchdog = Task { [weak self] in
             var seenLastTime = Set<UInt32>()

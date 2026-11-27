@@ -121,6 +121,11 @@ public actor MacProfileInstaller: ProfileInstaller, ProfileComparisonSwitching {
         } catch {
             throw ProfileInstallerError.cannotCopyProfile(error.localizedDescription)
         }
+        // Locked so no other process can rename or rewrite it. ArgyllCMS's
+        // `dispwin` replaces a display's current profile file in place when it
+        // can rename it; a locked file makes that fail safely, as it does for
+        // system profiles.
+        Self.setLocked(true, at: destination, fileManager: fileManager)
         return installationRecord
     }
 
@@ -359,12 +364,17 @@ public actor MacProfileInstaller: ProfileInstaller, ProfileComparisonSwitching {
         fileManager: FileManager
     ) -> Bool {
         guard isOwnedInstalledCandidate(candidate, in: profileDirectory) else { return false }
+        setLocked(false, at: candidate, fileManager: fileManager)
         do {
             try fileManager.removeItem(at: candidate)
             return true
         } catch {
             return false
         }
+    }
+
+    static func setLocked(_ locked: Bool, at url: URL, fileManager: FileManager) {
+        try? fileManager.setAttributes([.immutable: locked], ofItemAtPath: url.path)
     }
 
     private func setProfile(

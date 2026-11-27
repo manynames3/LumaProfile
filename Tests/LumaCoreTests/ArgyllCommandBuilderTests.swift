@@ -351,6 +351,7 @@ struct ArgyllCommandBuilderTests {
         ]))
         // Loading a calibration into the VideoLUT blanked the other display.
         #expect(!invocation.arguments.contains("-k"))
+        #expect(invocation.displayStateViolation == nil)
         #expect(invocation.arguments.containsOrderedSubsequence(["-P", "0.5,0.5,2.5,2.5"]))
         #expect(!invocation.arguments.contains("-Yp"))
         #expect(!invocation.arguments.containsOrderedSubsequence(["-Y", "p"]))
@@ -507,20 +508,23 @@ struct ArgyllCommandBuilderTests {
     }
 
     @Test
-    func testRestoreActiveProfileCalibrationTargetsOnlyConfirmedDisplay() throws {
-        let root = URL(fileURLWithPath: "/tmp/LumaProfile-Synthetic")
-        let installation = installation(at: root.appending(path: "bin"))
-        var display = TestSupport.display()
-        display.argyllDisplayIndex = 3
-
-        let invocation = try ArgyllCommandBuilder.restoreActiveProfileCalibration(
-            installation: installation,
-            display: display
-        )
-
-        #expect(invocation.tool == .dispwin)
-        #expect(invocation.executableURL == root.appending(path: "bin/dispwin"))
-        #expect(invocation.arguments == ["-v", "-d", "3", "-L"])
+    func invocationsThatWriteDisplayStateAreRefused() throws {
+        let bin = URL(fileURLWithPath: "/tmp/LumaProfile-Synthetic/bin")
+        let work = URL(fileURLWithPath: "/tmp/LumaProfile-Synthetic/session")
+        let refused: [ArgyllInvocation] = [
+            ArgyllInvocation(tool: .dispwin, executableURL: bin.appending(path: "dispwin"), arguments: ["-d", "2", "-L"]),
+            ArgyllInvocation(tool: .dispwin, executableURL: bin.appending(path: "dispwin"), arguments: ["-d", "2", "-c"]),
+            ArgyllInvocation(tool: .dispwin, executableURL: bin.appending(path: "dispwin"), arguments: ["-d", "2", "/tmp/a.cal"]),
+            ArgyllInvocation(tool: .dispwin, executableURL: bin.appending(path: "dispwin"), arguments: ["-I", "/tmp/a.icc"]),
+            ArgyllInvocation(tool: .dispread, executableURL: bin.appending(path: "dispread"), arguments: ["-k", "/tmp/a.cal", "/tmp/t"]),
+        ]
+        for invocation in refused {
+            #expect(throws: ArgyllEngineError.self) {
+                _ = try invocation.validatedProcessRequest(workingDirectoryURL: work)
+            }
+        }
+        let allowed = ArgyllInvocation(tool: .dispwin, executableURL: bin.appending(path: "dispwin"), arguments: ["-?"])
+        _ = try allowed.validatedProcessRequest(workingDirectoryURL: work)
     }
 
     @Test

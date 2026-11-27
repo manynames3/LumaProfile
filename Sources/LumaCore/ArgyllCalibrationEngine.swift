@@ -11,7 +11,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
     private let locator: any ArgyllInstallationLocating
     private let processExecutor: any ProcessExecuting
     private let interactiveSessionFactory: InteractiveProcessSessionFactory
-    private let systemCalibrationReloader: SystemCalibrationReloader?
+    private let systemCalibrationReloader: SystemCalibrationReloader
 
     private var cachedVersion: ArgyllVersion?
     private var activeWorkflowID: UUID?
@@ -35,7 +35,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
         interactiveSessionFactory: @escaping InteractiveProcessSessionFactory = {
             FoundationInteractiveProcessSession()
         },
-        systemCalibrationReloader: SystemCalibrationReloader? = nil
+        systemCalibrationReloader: @escaping SystemCalibrationReloader = {}
     ) {
         self.locator = locator
         self.processExecutor = processExecutor
@@ -53,7 +53,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
             do {
                 let invocation = try ArgyllCommandBuilder.probe(installation: installation)
                 let result = try await processExecutor.run(
-                    invocation.processRequest(
+                    try invocation.validatedProcessRequest(
                         workingDirectoryURL: FileManager.default.temporaryDirectory,
                         timeout: .seconds(15)
                     )
@@ -189,7 +189,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
         var awaitingReading = false
 
         do {
-            try await session.start(invocation.processRequest(
+            try await session.start(try invocation.validatedProcessRequest(
                 workingDirectoryURL: FileManager.default.temporaryDirectory,
                 timeout: .seconds(1_800)
             ))
@@ -313,37 +313,22 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
             workingDirectory: directory,
             recordIn: directory
         )
-        if let systemCalibrationReloader {
-            // `dispwin -L` cannot read ICC v4 profiles, which is what macOS
-            // associates with most displays: on real hardware it reported
-            // "ICC V4 not supported", assumed a linear table and then failed to
-            // set it. ColorSync reads every profile macOS accepts, so the
-            // operating system reloads the calibration instead.
-            systemCalibrationReloader()
-            let logs = directory.appendingPathComponent("logs", isDirectory: true)
-            try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
-            let note = "\(ISO8601DateFormatter().string(from: Date())) Asked ColorSync to reload display calibration from the currently associated profiles after validating Argyll display \(display.argyllDisplayIndex ?? 0).\n"
-            let noteURL = logs.appendingPathComponent("restore-videolut-colorsync.txt")
-            if let handle = try? FileHandle(forWritingTo: noteURL) {
-                defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: Data(note.utf8))
-            } else {
-                try Data(note.utf8).write(to: noteURL, options: .atomic)
-            }
-            return
+        // macOS reloads every display's calibration from its associated
+        // profile. ArgyllCMS's `dispwin -L` is never used: it cannot read ICC
+        // v4 profiles, and on macOS it rewrites the display's profile file to
+        // make the calibration persist (see ArgyllInvocation.displayStateViolation).
+        systemCalibrationReloader()
+        let logs = directory.appendingPathComponent("logs", isDirectory: true)
+        try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        let note = "\(ISO8601DateFormatter().string(from: Date())) Asked ColorSync to reload display calibration from the currently associated profiles after validating Argyll display \(display.argyllDisplayIndex ?? 0).\n"
+        let noteURL = logs.appendingPathComponent("restore-videolut-colorsync.txt")
+        if let handle = try? FileHandle(forWritingTo: noteURL) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(note.utf8))
+        } else {
+            try Data(note.utf8).write(to: noteURL, options: .atomic)
         }
-        let invocation = try ArgyllCommandBuilder.restoreActiveProfileCalibration(
-            installation: installation,
-            display: display
-        )
-        let result = try await runOneShot(
-            invocation,
-            workingDirectory: directory,
-            timeout: .seconds(60)
-        )
-        _ = try record(result, label: "restore-videolut-dispwin", in: directory)
-        guard result.exitCode == 0 else { throw processFailure(.dispwin, result) }
     }
 
     public func acknowledgeUserAction(id: String) async throws {
@@ -621,7 +606,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
     ) async throws -> ProcessResult {
         try Task.checkCancellation()
         let executor = processExecutor
-        let request = invocation.processRequest(workingDirectoryURL: workingDirectory, timeout: timeout)
+        let request = try invocation.validatedProcessRequest(workingDirectoryURL: workingDirectory, timeout: timeout)
         let task = Task { try await executor.run(request) }
         activeOneShotTask = task
         do {
@@ -663,7 +648,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
 
         do {
             try await session.start(
-                invocation.processRequest(workingDirectoryURL: workingDirectory, timeout: timeout)
+                try invocation.validatedProcessRequest(workingDirectoryURL: workingDirectory, timeout: timeout)
             )
             try await withTaskCancellationHandler {
                 for try await event in events {
@@ -752,7 +737,7 @@ public final actor ArgyllCalibrationEngine: CalibrationEngine {
 
         do {
             try await session.start(
-                invocation.processRequest(workingDirectoryURL: workingDirectory, timeout: timeout)
+                try invocation.validatedProcessRequest(workingDirectoryURL: workingDirectory, timeout: timeout)
             )
             try await withTaskCancellationHandler {
                 for try await event in events {
