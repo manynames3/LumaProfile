@@ -42,6 +42,19 @@ struct SettingsView: View {
                 Text("ArgyllCMS 3.5.0 is bundled with LumaProfile and selected automatically. Directory selection is an advanced override for development or diagnostics; choose its bin folder, not an individual executable. No administrator access is used.")
             }
 
+            Section {
+                Toggle("Black-screen guard", isOn: $model.isBackgroundGuardOn)
+                    .onChange(of: model.isBackgroundGuardOn) { model.applyBackgroundGuardSetting() }
+                if let problem = model.backgroundGuardProblem {
+                    Label(problem, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(Luma.caution)
+                }
+            } header: {
+                Text("Safety")
+            } footer: {
+                Text("Runs quietly in the background, even when LumaProfile is closed and after your Mac wakes. If a screen's colour curve ever goes black, it switches that screen to a safe colour profile within a few seconds. macOS lists it under Login Items as LumaProfile. Recommended: keep it on.")
+            }
+
             Section("Measurement") {
                 Picker("Display technology mode", selection: $model.measurementMode) {
                     ForEach(MeasurementMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }

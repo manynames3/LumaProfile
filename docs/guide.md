@@ -50,8 +50,8 @@ Developer ID signing and notarization are a future release-hardening step. Apple
 Public portfolio artifacts use a guarded wrapper around the same byte-preserving local packager:
 
 ```sh
-LUMAPROFILE_VERSION=0.1.6 \
-LUMAPROFILE_BUILD_NUMBER=7 \
+LUMAPROFILE_VERSION=0.1.7 \
+LUMAPROFILE_BUILD_NUMBER=8 \
 Scripts/package-github-release.sh
 ```
 
@@ -92,9 +92,15 @@ Only one application can usually own a meter at a time. Quit vendor calibration 
 
 Once a session has activated its After profile, the result card offers a **Before | After** switch with a neutral reference strip. Choosing **Before** temporarily points the same display back at the profile that was active when the run began so you can judge the change by eye; choosing **After** returns it. This is a viewing aid, not a rollback: the session stays recorded as activated, no file is removed, and LumaProfile puts After back before another profile-changing operation and before quitting. It refuses to switch if the display is on any profile other than those two. If the app is force-quit while Before is showing, the display stays on Before until you activate again or pick the profile in System Settings.
 
-## Two-display safety
+## Black-screen safety
 
-On a Mac with two displays, ArgyllCMS 3.5.0 zeroes the main display's colour curve (a black screen) when it loads a calibration into the VideoLUT of the other display. This was reproduced with `dispwin -d2 calibration.cal` on macOS 27.2.1; the zeroed curve survives the tool exiting and a ColorSync reload, and clears when the display's profile is re-associated. LumaProfile therefore characterizes with `dispread -K` (calibration applied to patch values) instead of `-k` (calibration loaded into the VideoLUT), and never asks ArgyllCMS to write a VideoLUT. While the app is open it also checks every display's curve every two seconds; a display that reads black twice in a row is reset to its default profile, and its previous profile is put back only if it then loads cleanly.
+**What went wrong.** On macOS, ArgyllCMS's `dispwin` makes a calibration "persistent" by renaming the display's current profile file to `<name>.orig`, writing a "Dispwin Temp" copy with a new calibration curve in its place, pointing ColorSync at it, then deleting the copy and renaming the original back (ArgyllCMS 3.5.0, `spectro/dispwin.c`). Any error or interruption after the first rename leaves the real profile replaced, and the screen goes black whenever macOS reloads it, including on wake with no app running. It only works on profiles the user can rename, which is exactly where LumaProfile installs its profiles. Separately, on a Mac with two displays, loading a calibration into one display's VideoLUT zeroed the main display's curve (reproduced with `dispwin -d2 file.cal` on macOS 27.2.1).
+
+**What LumaProfile does about it.**
+
+- It never asks ArgyllCMS to write a display's curve or profile. Every ArgyllCMS launch is checked: `dispwin` may only be run as `dispwin -?` (to list displays), and `dispread` must use `-K` (calibration applied to patch values), never `-k`. Anything else is refused before the process starts. Calibration is reloaded through ColorSync, never `dispwin -L`.
+- Profiles it installs are locked (the macOS "Locked" flag), so no other process can rename or rewrite them. LumaProfile unlocks its own file only to remove it.
+- A **black-screen guard** runs in the background as a login item, whether or not LumaProfile is open, and keeps running through sleep and wake. Every two seconds it reads each display's colour curve; a curve that is black on two checks in a row is repaired by switching that display to its default profile, then to the built-in sRGB profile if needed. The previous profile is put back only if it loads without going black. Every 30 seconds it also restores any profile ArgyllCMS left as `.orig`. It writes what it does to `~/Library/Logs/LumaProfile/display-guard.log`. It can be turned off in **Settings → Safety**; LumaProfile also runs the same check while its window is open.
 
 ## Local data, privacy, and reports
 

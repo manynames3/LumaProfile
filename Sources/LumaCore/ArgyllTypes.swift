@@ -166,6 +166,48 @@ public struct ArgyllInvocation: Hashable, Sendable {
         self.arguments = arguments
     }
 
+    /// ArgyllCMS options that write a display's colour curve or its profile
+    /// file beyond the life of the process. On macOS, `dispwin` makes a
+    /// calibration "persistent" by renaming the display's current profile to
+    /// `.orig`, writing a "Dispwin Temp" copy with a new vcgt in its place and
+    /// renaming it back afterwards (ArgyllCMS 3.5.0 spectro/dispwin.c). Any
+    /// failure or interruption in between leaves the user's profile replaced,
+    /// which blanks the screen whenever macOS reloads it, including on wake.
+    /// LumaProfile never needs this: it only asks `dispwin` for its usage text,
+    /// and `dispread` applies calibration to patch values (`-K`), not the
+    /// VideoLUT (`-k`).
+    public var displayStateViolation: String? {
+        switch tool {
+        case .dispwin:
+            return arguments == ["-?"]
+                ? nil
+                : "dispwin may only be run as 'dispwin -?'; any other use can rewrite a display profile."
+        case .dispread:
+            return arguments.contains("-k")
+                ? "dispread -k loads a calibration into a display's VideoLUT."
+                : nil
+        default:
+            return nil
+        }
+    }
+
+    /// Builds the process request, refusing any invocation that could change
+    /// a display's curve or profile outside the measuring process.
+    public func validatedProcessRequest(
+        workingDirectoryURL: URL,
+        timeout: Duration? = nil,
+        standardInput: Data? = nil
+    ) throws -> ProcessRequest {
+        if let displayStateViolation {
+            throw ArgyllEngineError.invalidRequest("Refused to run ArgyllCMS: \(displayStateViolation)")
+        }
+        return processRequest(
+            workingDirectoryURL: workingDirectoryURL,
+            timeout: timeout,
+            standardInput: standardInput
+        )
+    }
+
     public func processRequest(
         workingDirectoryURL: URL,
         timeout: Duration? = nil,

@@ -1,6 +1,17 @@
 import SwiftUI
 
 @main
+enum LumaProfileLauncher {
+    static func main() {
+        if CommandLine.arguments.contains(DisplayGuardAgent.argument) {
+            DisplayGuardAgent.runForever()
+        }
+        MainActor.assumeIsolated {
+            LumaProfileApp.main()
+        }
+    }
+}
+
 @MainActor
 struct LumaProfileApp: App {
     @NSApplicationDelegateAdaptor(LumaProfileAppDelegate.self) private var appDelegate

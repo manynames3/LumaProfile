@@ -36,27 +36,107 @@ public enum DisplayCurveGuard {
         }
     }
 
-    /// Resets each black display to its default profile so the screen is
-    /// usable again, then puts its previous profile back if that loads
-    /// cleanly. Returns the displays that were black.
+    /// The macOS built-in sRGB profile: always present, read-only, and the
+    /// profile that brought blacked-out screens back on real hardware.
+    static let systemSRGB = URL(fileURLWithPath: "/System/Library/ColorSync/Profiles/sRGB Profile.icc")
+
+    /// Makes every black display usable again and returns the ones repaired.
+    ///
+    /// For each black display: switch to the display's default profile; if it
+    /// is still black, switch to the built-in sRGB profile. Once the screen is
+    /// back, its previous profile is tried again and kept only if it loads
+    /// without going black. The app and the background guard serialise on a
+    /// lock so they never change profiles at the same time.
     @discardableResult
     public static func repairBlackDisplays() -> [CGDirectDisplayID] {
-        let black = blackDisplays()
-        for display in black {
-            let previous = profileURL(for: display)
-            guard setProfile(nil, for: display) else { continue }
-            CGDisplayRestoreColorSyncSettings()
-            usleep(400_000)
-            guard let previous, FileManager.default.fileExists(atPath: previous.path) else { continue }
-            guard setProfile(previous, for: display) else { continue }
-            usleep(400_000)
-            if blackDisplays().contains(display) {
-                // The previous profile is what loads as black; stay on the default.
-                _ = setProfile(nil, for: display)
+        withRepairLock {
+            let black = blackDisplays()
+            for display in black {
+                let previous = profileURL(for: display)
+                var recovered = false
+                if setProfile(nil, for: display) {
+                    CGDisplayRestoreColorSyncSettings()
+                    usleep(400_000)
+                    recovered = !blackDisplays().contains(display)
+                }
+                if !recovered, FileManager.default.fileExists(atPath: systemSRGB.path),
+                   setProfile(systemSRGB, for: display) {
+                    CGDisplayRestoreColorSyncSettings()
+                    usleep(400_000)
+                    recovered = !blackDisplays().contains(display)
+                }
+                guard recovered,
+                      let previous,
+                      previous.standardizedFileURL != systemSRGB.standardizedFileURL,
+                      FileManager.default.fileExists(atPath: previous.path)
+                else { continue }
+                let safe = profileURL(for: display)
+                guard setProfile(previous, for: display) else { continue }
                 CGDisplayRestoreColorSyncSettings()
+                usleep(400_000)
+                if blackDisplays().contains(display) {
+                    // The previous profile is what loads as black: keep the safe one.
+                    _ = setProfile(safe, for: display)
+                    CGDisplayRestoreColorSyncSettings()
+                }
+            }
+            return black
+        }
+    }
+
+    /// Puts back any display profile that ArgyllCMS's `dispwin` left swapped.
+    ///
+    /// `dispwin` renames a display's current profile to `<name>.orig`, writes a
+    /// "Dispwin Temp" copy in its place, and renames the original back when it
+    /// finishes. If it is interrupted, the original is left as `.orig`. This
+    /// restores any `.orig` whose rename is more than a minute old and whose
+    /// sibling is missing or is a "Dispwin Temp" copy. Returns restored paths.
+    @discardableResult
+    public static func restoreArgyllLeftovers(
+        in roots: [URL] = defaultProfileRoots,
+        now: Date = Date()
+    ) -> [URL] {
+        let fileManager = FileManager.default
+        var restored: [URL] = []
+        for root in roots {
+            guard let walker = fileManager.enumerator(at: root, includingPropertiesForKeys: nil) else { continue }
+            for case let backup as URL in walker where backup.pathExtension == "orig" {
+                let original = backup.deletingPathExtension()
+                guard ["icc", "icm"].contains(original.pathExtension.lowercased()) else { continue }
+                var info = stat()
+                guard stat(backup.path, &info) == 0 else { continue }
+                let changed = Date(timeIntervalSince1970: TimeInterval(info.st_ctimespec.tv_sec))
+                guard now.timeIntervalSince(changed) > 60 else { continue }
+                if fileManager.fileExists(atPath: original.path) {
+                    guard let data = try? Data(contentsOf: original),
+                          data.range(of: Data("Dispwin Temp".utf8)) != nil else { continue }
+                    try? fileManager.setAttributes([.immutable: false], ofItemAtPath: original.path)
+                    guard (try? fileManager.removeItem(at: original)) != nil else { continue }
+                }
+                if (try? fileManager.moveItem(at: backup, to: original)) != nil {
+                    restored.append(original)
+                }
             }
         }
-        return black
+        if !restored.isEmpty { CGDisplayRestoreColorSyncSettings() }
+        return restored
+    }
+
+    public static var defaultProfileRoots: [URL] {
+        [FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/ColorSync/Profiles", directoryHint: .isDirectory)]
+    }
+
+    private static func withRepairLock<T>(_ body: () -> T) -> T {
+        let directory = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Application Support/LumaProfile", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let path = directory.appending(path: "display-guard.lock").path
+        let descriptor = open(path, O_CREAT | O_RDWR, 0o600)
+        guard descriptor >= 0 else { return body() }
+        defer { close(descriptor) }
+        flock(descriptor, LOCK_EX)
+        defer { flock(descriptor, LOCK_UN) }
+        return body()
     }
 
     private static func profileURL(for display: CGDirectDisplayID) -> URL? {

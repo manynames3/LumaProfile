@@ -190,21 +190,6 @@ public enum ArgyllCommandBuilder {
         )
     }
 
-    /// Reloads the calibration from the profile currently associated with only
-    /// the explicitly selected display. This does not install or associate a
-    /// profile.
-    public static func restoreActiveProfileCalibration(
-        installation: ArgyllInstallation,
-        display: PhysicalDisplay
-    ) throws -> ArgyllInvocation {
-        let displayIndex = try requiredDisplayIndex(display)
-        return ArgyllInvocation(
-            tool: .dispwin,
-            executableURL: try installation.executable(for: .dispwin),
-            arguments: ["-v", "-d", String(displayIndex), "-L"]
-        )
-    }
-
     public static func requiredDisplayIndex(_ display: PhysicalDisplay) throws -> Int {
         guard let index = display.argyllDisplayIndex, index > 0 else {
             throw ArgyllEngineError.invalidRequest(

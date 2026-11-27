@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import LumaCore
 
@@ -29,5 +30,54 @@ struct DisplayCurveGuardTests {
     func emptyOrMismatchedTablesAreNotReportedBlack() {
         #expect(!DisplayCurveGuard.isBlack(red: [], green: [], blue: []))
         #expect(!DisplayCurveGuard.isBlack(red: [0], green: [0, 0], blue: [0]))
+    }
+}
+
+@Suite
+struct ArgyllLeftoverTests {
+    @Test
+    func restoresAnInterruptedDispwinSwap() throws {
+        let root = try TestSupport.makeTemporaryDirectory()
+        defer { TestSupport.removeTemporaryDirectory(root) }
+        let original = root.appending(path: "Display.icc")
+        let backup = root.appending(path: "Display.icc.orig")
+        try Data("real profile".utf8).write(to: backup)
+        try Data("header Dispwin Temp vcgt".utf8).write(to: original)
+
+        let restored = DisplayCurveGuard.restoreArgyllLeftovers(in: [root], now: Date().addingTimeInterval(120))
+
+        #expect(restored.map(\.lastPathComponent) == ["Display.icc"])
+        #expect(try String(decoding: Data(contentsOf: original), as: UTF8.self) == "real profile")
+        #expect(!FileManager.default.fileExists(atPath: backup.path))
+    }
+
+    @Test
+    func restoresWhenTheOriginalNameIsMissing() throws {
+        let root = try TestSupport.makeTemporaryDirectory()
+        defer { TestSupport.removeTemporaryDirectory(root) }
+        let backup = root.appending(path: "Display.icc.orig")
+        try Data("real profile".utf8).write(to: backup)
+
+        let restored = DisplayCurveGuard.restoreArgyllLeftovers(in: [root], now: Date().addingTimeInterval(120))
+
+        #expect(restored.count == 1)
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "Display.icc").path))
+    }
+
+    @Test
+    func leavesARecentSwapAndAnUnrelatedFileAlone() throws {
+        let root = try TestSupport.makeTemporaryDirectory()
+        defer { TestSupport.removeTemporaryDirectory(root) }
+        let original = root.appending(path: "Display.icc")
+        let backup = root.appending(path: "Display.icc.orig")
+        try Data("real profile".utf8).write(to: backup)
+        try Data("header Dispwin Temp vcgt".utf8).write(to: original)
+        // Within the minute dispwin needs to finish its own swap.
+        #expect(DisplayCurveGuard.restoreArgyllLeftovers(in: [root], now: Date()).isEmpty)
+
+        // A sibling that is not ArgyllCMS's temporary copy is never replaced.
+        try Data("some other profile".utf8).write(to: original)
+        #expect(DisplayCurveGuard.restoreArgyllLeftovers(in: [root], now: Date().addingTimeInterval(120)).isEmpty)
+        #expect(FileManager.default.fileExists(atPath: backup.path))
     }
 }
