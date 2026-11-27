@@ -1,0 +1,30 @@
+name: Display guard smoke
+
+on:
+  push:
+    branches: [safety-lockdown]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build -c release --product LumaProfileApp
+      - name: Black curve is repaired by the guard
+        shell: zsh {0}
+        run: |
+          bin="$(swift build -c release --show-bin-path)/LumaProfileApp"
+          swiftc -O Scripts/ci/display-guard-smoke.swift -o /tmp/smoke
+          echo "== before"; /tmp/smoke read
+          echo "== zero held for 12 s, no guard (control)"
+          /tmp/smoke zero 12 & holder=$!; sleep 3; /tmp/smoke read; sleep 6; /tmp/smoke read; wait $holder
+          echo "== zero held for 15 s, guard running"
+          "$bin" --display-guard & guard=$!
+          sleep 2
+          /tmp/smoke zero 15 & holder=$!
+          for i in 1 2 3 4 5 6 7 8 9 10; do sleep 1; echo -n "t=${i}s "; /tmp/smoke read; done
+          wait $holder; kill $guard
+          echo "== guard log"; cat ~/Library/Logs/LumaProfile/display-guard.log || true
