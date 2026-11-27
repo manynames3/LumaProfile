@@ -960,6 +960,17 @@ final class AppModel: ObservableObject {
 
     func startBlackScreenWatchdog() {
         applyBackgroundGuardSetting()
+        let profileCheck = ExistingProfileSecurity.secure()
+        DisplayGuardAgent.logProfileCheck(profileCheck)
+        if !profileCheck.locked.isEmpty {
+            logs.append(LogRecord(level: "Info", message: "Locked \(profileCheck.locked.count) earlier LumaProfile profile(s) so nothing else can rewrite them."))
+        }
+        if !profileCheck.quarantined.isEmpty {
+            let names = profileCheck.quarantined.map(\.lastPathComponent).joined(separator: ", ")
+            let message = "LumaProfile found \(profileCheck.quarantined.count == 1 ? "a damaged profile" : "\(profileCheck.quarantined.count) damaged profiles") that could turn a screen black (\(names)) and moved \(profileCheck.quarantined.count == 1 ? "it" : "them") out of System Settings. Any screen that used one is now on its standard profile. Recalibrate that screen to make a new one."
+            logs.append(LogRecord(level: "Warning", message: message))
+            alert = AppAlert(title: "Damaged colour profile removed", message: message)
+        }
         let leftovers = DisplayCurveGuard.restoreArgyllLeftovers()
         if !leftovers.isEmpty {
             logs.append(LogRecord(level: "Warning", message: "Restored \(leftovers.count) display profile(s) that ArgyllCMS had left swapped."))

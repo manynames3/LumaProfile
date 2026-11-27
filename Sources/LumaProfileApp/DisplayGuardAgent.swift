@@ -29,6 +29,7 @@ enum DisplayGuardAgent {
 
     static func runForever() -> Never {
         log("Started (pid \(getpid())).")
+        logProfileCheck(ExistingProfileSecurity.secure())
         var seenLastTime = Set<CGDirectDisplayID>()
         var tick = 0
         while true {
@@ -43,6 +44,9 @@ enum DisplayGuardAgent {
                 }
                 seenLastTime = []
             }
+            if tick % 900 == 0, tick > 0 {
+                logProfileCheck(ExistingProfileSecurity.secure())
+            }
             if tick % 15 == 0 {
                 let restored = DisplayCurveGuard.restoreArgyllLeftovers()
                 if !restored.isEmpty {
@@ -51,6 +55,15 @@ enum DisplayGuardAgent {
             }
             tick &+= 1
             Thread.sleep(forTimeInterval: 2)
+        }
+    }
+
+    static func logProfileCheck(_ report: ExistingProfileSecurity.Report) {
+        if !report.locked.isEmpty {
+            log("Locked existing LumaProfile profile(s): \(report.locked.map(\.lastPathComponent)).")
+        }
+        if !report.quarantined.isEmpty {
+            log("Moved damaged profile(s) out of ColorSync: \(report.quarantined.map(\.path)).")
         }
     }
 
