@@ -5,9 +5,9 @@
 **Make your Mac screen show true colors.**<br>
 Plug in a color meter. Click through 4 steps. Get a checked color profile.
 
-> **Update to 0.1.7.** Earlier versions could leave a screen black, during a calibration or later when the Mac woke from sleep. 0.1.7 removes the cause and adds a background black-screen guard that repairs a black screen within seconds, even when LumaProfile is closed. If you ever see a black screen on an older version, pick a different colour profile for it in System Settings → Displays. [What happened](docs/guide.md#black-screen-safety).
+> **Update to 0.1.8.** Earlier versions could leave a screen black, during a calibration or later when the Mac woke from sleep. 0.1.7 and later remove the cause and adds a background black-screen guard that repairs a black screen within seconds, even when LumaProfile is closed. If you ever see a black screen on an older version, pick a different colour profile for it in System Settings → Displays. [What happened](docs/guide.md#black-screen-safety).
 
-**[⬇ Download for Mac (0.1.7 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.7/LumaProfile-0.1.7-arm64.dmg)**<br>
+**[⬇ Download for Mac (0.1.8 preview)](https://github.com/manynames3/LumaProfile/releases/download/v0.1.8/LumaProfile-0.1.8-arm64.dmg)**<br>
 <sub>Apple Silicon · macOS 15+ · not notarized, so macOS asks you to approve it once</sub>
 
 <img src="docs/images/hardware.jpg" alt="LumaProfile calibrating a Dell monitor with an i1 Display Pro meter" width="720">
@@ -61,7 +61,7 @@ You need:
 - An Apple Silicon Mac on macOS 15 or newer
 - An X-Rite i1Display Pro or Plus meter (USB)
 
-1. [Download the DMG](https://github.com/manynames3/LumaProfile/releases/download/v0.1.7/LumaProfile-0.1.7-arm64.dmg) ([all releases](https://github.com/manynames3/LumaProfile/releases)).
+1. [Download the DMG](https://github.com/manynames3/LumaProfile/releases/download/v0.1.8/LumaProfile-0.1.8-arm64.dmg) ([all releases](https://github.com/manynames3/LumaProfile/releases)).
 2. Open it. Drag LumaProfile to Applications.
 3. Right-click the app and choose **Open** the first time.
 
