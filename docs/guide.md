@@ -50,8 +50,8 @@ Developer ID signing and notarization are a future release-hardening step. Apple
 Public portfolio artifacts use a guarded wrapper around the same byte-preserving local packager:
 
 ```sh
-LUMAPROFILE_VERSION=0.1.7 \
-LUMAPROFILE_BUILD_NUMBER=8 \
+LUMAPROFILE_VERSION=0.1.8 \
+LUMAPROFILE_BUILD_NUMBER=9 \
 Scripts/package-github-release.sh
 ```
 
@@ -100,6 +100,7 @@ Once a session has activated its After profile, the result card offers a **Befor
 
 - It never asks ArgyllCMS to write a display's curve or profile. Every ArgyllCMS launch is checked: `dispwin` may only be run as `dispwin -?` (to list displays), and `dispread` must use `-K` (calibration applied to patch values), never `-k`. Anything else is refused before the process starts. Calibration is reloaded through ColorSync, never `dispwin -L`.
 - Profiles it installs are locked (the macOS "Locked" flag), so no other process can rename or rewrite them. LumaProfile unlocks its own file only to remove it.
+- Profiles installed by earlier versions are checked every time LumaProfile starts and at every login: healthy ones are locked, and damaged ones (an ArgyllCMS "Dispwin Temp" copy, or a calibration curve that would show as black) are moved to `~/Library/Application Support/LumaProfile/Quarantined Profiles`, so macOS stops loading them.
 - A **black-screen guard** runs in the background as a login item, whether or not LumaProfile is open, and keeps running through sleep and wake. Every two seconds it reads each display's colour curve; a curve that is black on two checks in a row is repaired by switching that display to its default profile, then to the built-in sRGB profile if needed. The previous profile is put back only if it loads without going black. Every 30 seconds it also restores any profile ArgyllCMS left as `.orig`. It writes what it does to `~/Library/Logs/LumaProfile/display-guard.log`. It can be turned off in **Settings → Safety**; LumaProfile also runs the same check while its window is open.
 
 ## Local data, privacy, and reports
